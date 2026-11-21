@@ -1,0 +1,68 @@
+[project]
+name = "motherduck-pg-cdc-flight"
+version = "0.1.0"
+description = "Bounded PostgreSQL CDC ingestion into MotherDuck"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Carlin Eng" }]
+dependencies = ["duckdb==1.5.6", "psycopg2-binary==2.9.11", "psycopg[binary]==3.3.7", "pyarrow==23.0.1"]
+
+[project.urls]
+Homepage = "https://github.com/motherduckdb/motherduck-pg-cdc-flight"
+Repository = "https://github.com/motherduckdb/motherduck-pg-cdc-flight"
+Issues = "https://github.com/motherduckdb/motherduck-pg-cdc-flight/issues"
+
+[project.scripts]
+cdc-flight = "cdc_flight.cli:main"
+cdc-flight-tables = "cdc_flight.tables_cli:main"
+cdc-flight-label = "cdc_flight.label_cli:main"
+
+[dependency-groups]
+dev = [
+    "python-dotenv==1.2.2",
+    "pytest>=9.2,<10",
+    "ruff>=0.12,<1",
+    "pytest-xdist>=3.6,<4",
+    "basedpyright==1.40.2",
+]
+
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cdc_flight"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "postgres: requires CDC_TEST_PG_DSN",
+    "motherduck: requires CDC_TEST_MD=1",
+    "md_gate: heavy MotherDuck test; runs only with CDC_TEST_MD_GATE=1 or -m md_gate",
+    "replica: needs a primary + standby pair (compose profile replica, CDC_TEST_REPLICA_DSNS)",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+# The generation command spec and its adapter are strictly typed. Only these files:
+# the rest of the package is unannotated. No suppressions: type-ignore comments are disabled,
+# and tests/test_generation_commands.py rejects any `# pyright:` comment in them;
+# scripts/check_types.py --canary proves a seeded error or suppression fails, and the
+# check refuses to run if these settings are loosened.
+[tool.basedpyright]
+include = [
+    "src/cdc_flight/generation_spec.py",
+    "src/cdc_flight/generation_commands.py",
+    "src/cdc_flight/publication_commands.py",
+    "src/cdc_flight/lifecycle_spec.py",
+    "src/cdc_flight/lifecycle_commands.py",
+]
+typeCheckingMode = "strict"
+enableTypeIgnoreComments = false
+reportUnnecessaryTypeIgnoreComment = "error"
+pythonVersion = "3.12"

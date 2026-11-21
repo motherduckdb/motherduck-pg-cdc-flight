@@ -1,0 +1,42 @@
+# A source file for scripts/deploy_flights.py (docs/flights.md, "Deploy a source's Flights").
+# Names only: never a password, DSN or token. Keep real files outside the repository: they
+# name your organization.
+
+org = "my-org"                 # must equal md_user_info()'s org_name for the token used
+source = "shop"                # CDC_SOURCE_ID: lowercase letters, digits, underscores
+package = "0123456789abcdef0123456789abcdef01234567"  # a full commit SHA merged to main
+pg_ca = "rds-global"           # verify-full TLS for the PostgreSQL Flights (omit: none)
+
+[postgres]
+secret = "cdc_pg"              # the MotherDuck Flights secret holding the replication role's DSN
+key = "DSN"                    # its key: Flights read the variable cdc_pg_DSN
+# membership_secret = "cdc_pg_ro"  # optional: table-membership's own read-only role
+# membership_key = "DSN"           # (docs/operations.md, two roles); every other Flight keeps `secret`
+# publication = "shop_pub"     # default md_cdc_<source>_pub (set it if the DBA script used another)
+# heartbeat = "public.md_cdc_heartbeat"
+# slot = "md_cdc_shop"
+# A read replica (standby) source (docs/setup.md): the DBA's job on the primary writes the
+# heartbeat, and the backfill Flight must be a package Flight.
+# heartbeat_writer = "external"
+# heartbeat_interval_seconds = 60  # the DBA job's interval (display only)
+
+# [secrets]
+# package = "cdc_flight_pkg"   # only for a private copy of the repository: the Flights secret
+#                              # of a read-only GitHub token. Omitted, the install is anonymous.
+
+[preflight]
+tables = ["public.orders", "public.customers"]   # keyed tables only; append tables join later
+create_objects = true          # preflight creates only what's missing (the slot, per the DBA script)
+
+[ingest]
+enabled = false                # true turns on ingest's */3 schedule (setup.md: after approval)
+
+[destructive]
+enabled = true                 # the epoch and delete-source Flights (the Dive's Danger zone)
+
+# Per-Flight overrides (defaults: docs/flights.md, "Deploy a source's Flights"):
+# [flights.apply]
+# schedule = "*/10 * * * *"
+# instance = "F16"
+# max_runtime_sec = 900
+# name = "cdc-shop-apply"

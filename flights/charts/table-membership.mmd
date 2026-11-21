@@ -1,0 +1,21 @@
+flowchart TD
+  validate{Check the inputs}:::check
+  validate -->|refused| invalid(Refused: an input is missing, malformed or not used by the action):::transform
+  validate -->|ok| attach[Attach the change log and the mirror]:::query
+  attach --> decide{Read the registry and PostgreSQL, and decide}:::check
+  decide -->|refused| refused(Refused: the table, its state or the publication does not allow it, or the source is being deleted):::transform
+  decide -->|already| already(Nothing to do):::transform
+  decide -->|would| preview[Dry run: record the preview]:::load
+  decide -->|act| act[Wait for the ingest lease, check the preview, then spend it and change the registry in one transaction]:::load
+  act --> outcome{Result}:::check
+  outcome -->|done| done(Done):::transform
+  outcome -->|already| already
+  outcome -->|busy| busy(Ingest or apply held the lease past the wait; retry):::transform
+  decide -->|drain| drain(An open unit must drain first: run ingest, then a new dry run):::transform
+  outcome -->|drain| drain
+  outcome -->|refused| moved(Refused: no matching preview, or the table changed):::transform
+  outcome -->|trigger| trigger[Start the backfill Flight for the added table]:::flight
+  trigger --> done
+  whois[Look up who started this run]:::query
+  audit[Copy the result to the operations database]:::load
+  audit --> snapshot[Refresh the operations snapshot, once]:::load

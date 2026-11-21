@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  # Every pull request runs everything, markdown-only ones too: tests read docs
+  # (test_deploy_flights reads docs/flights.md; test_authority checks budgets' doc evidence).
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev --locked
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      # The generation spec and adapter, strictly typed (basedpyright, pinned).
+      - run: uv run python scripts/check_types.py
+      # Its negative canary: a seeded type error or suppression must fail the check.
+      - run: uv run python scripts/check_types.py --canary
+
+  tests:
+    # Local DuckDB and real PostgreSQL only. MotherDuck variants and benchmarks skip
+    # without CDC_TEST_MD and CDC_BENCHMARK; no secrets are used.
+    # The runner has 2 vCPUs and the suite is CPU-bound, so each major is split into
+    # whole-file shards (tests/ci_shard.py, weights in tests/ci_weights.json), each run
+    # on both cores with xdist. Every test runs in exactly one shard per major.
+    name: tests (PG${{ matrix.postgres }}, shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [13, 16, 18]
+        shard: [1, 2, 3, 4]
+        include:
+          - postgres: 13
+            service: postgres13
+            port: 55413
+          - postgres: 16
+            service: postgres
+            port: 55432
+          - postgres: 18
+            service: postgres18
+            port: 55418
+    env:
+      CDC_TEST_PG_DSN: host=127.0.0.1 port=${{ matrix.port }} dbname=cdc_phase0 user=postgres password=phase0-local-only
+      # conftest fails the session unless the DSN reaches this major version.
+      CDC_TEST_PG_MAJOR: ${{ matrix.postgres }}
+      CDC_TEST_SHARD: ${{ matrix.shard }}/4
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      # The runner's CPU model varies between jobs and explains most timing differences.
+      - run: nproc; lscpu | grep 'Model name'
+      - run: uv sync --dev --locked
+      # compose.yaml, not services:, because the server needs wal_level=logical.
+      - run: docker compose --profile matrix up -d --wait ${{ matrix.service }}
+      # --durations=0: the per-file seconds that tests/ci_weights.json is regenerated from.
+      - run: uv run pytest -q -rs -k 'not benchmark' -n 2 --durations=0
+      - if: failure()
+        run: docker compose --profile matrix logs ${{ matrix.service }}
+
+  replica:
+    # Replica capture: a PG16 primary plus a physical streaming standby (compose
+    # profile `replica`); the `replica`-marked tests (the spike and capture from the
+    # standby). Local DuckDB only; no secrets.
+    name: replica (PG16 primary + standby)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CDC_TEST_REPLICA_DSNS: >-
+        {"16": {"primary": "host=127.0.0.1 port=55616 dbname=cdc_phase0 user=postgres password=phase0-local-only",
+        "standby": "host=127.0.0.1 port=55626 dbname=cdc_phase0 user=postgres password=phase0-local-only"}}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev --locked
+      - run: docker compose --profile replica up -d --wait replica16-primary replica16-standby
+      - run: uv run pytest -q -rs -m replica --durations=0
+      - if: failure()
+        run: docker compose --profile replica logs replica16-primary replica16-standby
+
+  package:
+    # The installed package that package Flights run (docs/flights.md, "Package install"):
+    # a clean venv builds and installs this checkout with the pinned build backend, and
+    # every module and command entry imports from the install. No secrets.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      - run: uv venv "$RUNNER_TEMP/pkg"
+      - run: uv pip install --python "$RUNNER_TEMP/pkg/bin/python" .
+      - run: '"$RUNNER_TEMP/pkg/bin/python" -I scripts/check_package.py .'
+
+  dive:
+    # The operations Dive (dive/): types, unit tests, the query snapshot's freshness,
+    # and the bundle deploy_dive.py uploads. No secrets, no MotherDuck.
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: dive
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dive/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run bundle

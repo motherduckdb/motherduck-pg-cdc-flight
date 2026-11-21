@@ -1,0 +1,9 @@
+flowchart TD
+  endpoint[Check the endpoint]:::check --> connect[Connect to PostgreSQL]:::extract
+  connect --> server[Check server settings]:::check
+  server --> replication[Check replication capability]:::check
+  replication --> tables[Check tables and keys]:::check
+  tables --> objects{Slot, publication and heartbeat}:::check
+  objects -->|present| register[Register the source]:::query
+  objects -->|created| register
+  objects -->|missing| provision(Provision them, or ask the DBA):::transform

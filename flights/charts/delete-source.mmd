@@ -1,0 +1,17 @@
+flowchart TD
+  validate{Check the inputs}:::check
+  validate -->|refused| invalid(Refused: an input is missing, malformed or not used):::transform
+  validate -->|ok| attach[Attach the change log]:::query
+  attach --> decide{Read the source and what it owns, and decide}:::check
+  decide -->|refused| refused(Refused: a stale epoch or a different confirmation):::transform
+  decide -->|already| already(Already deleted, or being deleted for a dry run):::transform
+  decide -->|would| preview[Dry run: record the preview]:::load
+  decide -->|act| act[Spend the preview and mark the source deleting, then drop what it created]:::load
+  act --> outcome{Result}:::check
+  outcome -->|done| done(Deleted: capture stopped; mirrors and the log kept):::transform
+  outcome -->|already| already
+  outcome -->|waiting| waiting(Waiting: a reader is still attached, or the lease is busy; run again):::transform
+  outcome -->|refused| moved(Refused: no matching preview, or the source changed):::transform
+  whois[Look up who started this run]:::query
+  audit[Copy the result to the operations database]:::load
+  audit --> snapshot[Refresh the operations snapshot, once]:::load

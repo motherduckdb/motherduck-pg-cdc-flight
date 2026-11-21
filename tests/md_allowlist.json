@@ -1,0 +1,147 @@
+[
+  {
+    "nodeid": "tests/test_protocols.py::test_fence_takeover_rejects_stale_worker[motherduck]",
+    "observed_seconds": 4.84,
+    "reason": "Old MVCC snapshots cannot bypass takeover."
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_guard_conflicts_across_motherduck_processes[motherduck-takeover-apply]",
+    "observed_seconds": 4.23,
+    "reason": "Independent apply writer conflicts with takeover."
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_guard_conflicts_across_motherduck_processes[motherduck-pin-retention]",
+    "observed_seconds": 4.53,
+    "reason": "Independent pin registration conflicts with retention guard."
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_two_database_writes_rejected_and_rolled_back[motherduck]",
+    "observed_seconds": 2.09,
+    "reason": "A transaction cannot write both databases."
+  },
+  {
+    "nodeid": "tests/test_publish.py::test_publish_keeps_primary_key_and_is_atomic[motherduck]",
+    "observed_seconds": 4.56,
+    "reason": "Publication preserves primary key and reader atomicity."
+  },
+  {
+    "nodeid": "tests/test_publish.py::test_publish_rollback_and_stale_compare_and_set_change_nothing[motherduck]",
+    "observed_seconds": 5.34,
+    "reason": "Rename rollback and stale compare-and-set preserve current mirror."
+  },
+  {
+    "nodeid": "tests/test_publish.py::test_publish_conflicts_with_concurrent_guard_write[motherduck]",
+    "observed_seconds": 4.06,
+    "reason": "Publication conflicts with an apply guard."
+  },
+  {
+    "nodeid": "tests/test_phase1.py::test_real_ingest_restart_feedback_idle_and_schema[motherduck]",
+    "observed_seconds": 32.45,
+    "reason": "Real PG ingest restarts, feedback, idle capture and schema recording."
+  },
+  {
+    "nodeid": "tests/test_feedback.py::test_crashed_run_leaves_slot_at_the_durable_checkpoint[motherduck]",
+    "observed_seconds": 23.69,
+    "reason": "A crash leaves feedback at the durable checkpoint."
+  },
+  {
+    "nodeid": "tests/test_ingest_batching.py::test_a_partial_batch_replayed_with_another_composition_stores_once[motherduck-before_commit]",
+    "observed_seconds": 34.34,
+    "reason": "Partially durable batches replay without duplicates."
+  },
+  {
+    "nodeid": "tests/test_phase2.py::test_type_fidelity_against_native_values_and_poison_cut[motherduck]",
+    "observed_seconds": 27.69,
+    "reason": "Native PostgreSQL values survive remote casts exactly."
+  },
+  {
+    "nodeid": "tests/test_backfill.py::test_backfill_under_load_crashes_and_publication[motherduck]",
+    "observed_seconds": 46.74,
+    "reason": "Backfill catches concurrent writes and recovers chunk crashes."
+  },
+  {
+    "nodeid": "tests/test_backfill.py::test_resync_replaces_stale_mirror_and_fences_old_writers[motherduck]",
+    "observed_seconds": 60.47,
+    "reason": "Resync fences old generations and recovers publication faults."
+  },
+  {
+    "nodeid": "tests/test_backfill.py::test_publish_never_replaces_a_table_without_apply_state[motherduck-stale_catalog]",
+    "observed_seconds": 29.36,
+    "reason": "A stale catalog cannot cause an unmanaged table to be dropped."
+  },
+  {
+    "nodeid": "tests/test_retention.py::test_pins_advance_after_commit_quiet_tables_and_floor[motherduck]",
+    "observed_seconds": 60.89,
+    "reason": "Pins advance after commit and enforce the strict retention floor."
+  },
+  {
+    "nodeid": "tests/test_quarantine_flight.py::test_whole_unit_quarantine_through_main[motherduck]",
+    "reason": "The only format-2 destructive action end to end through main() on MotherDuck: a real poison held before one whole unit; a pre-COMMIT failure lands nothing, the same preview commits once despite a lost response, the rerun is already, the next apply passes the unit END without its rows; each outcome read on a fresh md: instance; the change log and an absent ops database untouched. Replaces the retention drop rollback node (proof-map #22; its claim stays local in test_retention/test_retention2).",
+    "observed_seconds": 45.13
+  },
+  {
+    "nodeid": "tests/test_retention.py::test_pin_writes_of_two_consumers_and_compaction_serialize[motherduck]",
+    "observed_seconds": 31.86,
+    "reason": "Production pin registration and compaction serialize."
+  },
+  {
+    "nodeid": "tests/test_epoch_pg.py::test_slot_loss_begins_an_epoch_and_a_resync_rebuilds_the_mirror[motherduck]",
+    "observed_seconds": 80.8,
+    "reason": "Slot loss establishes a new epoch and a correct mirror."
+  },
+  {
+    "nodeid": "tests/test_table_checks.py::test_replica_identity_lost_mid_run_holds_alone_and_forces_a_resync[motherduck]",
+    "observed_seconds": 99.58,
+    "reason": "A table hold does not stop its source and can recover."
+  },
+  {
+    "nodeid": "tests/test_compaction.py::test_compaction_drops_days_and_keeps_the_ledger_bounded[motherduck]",
+    "observed_seconds": 71.78,
+    "reason": "The production compaction driver drops days and bounds its ledger."
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_guard_renews_lease_using_database_clock[motherduck]",
+    "reason": "MotherDuck server time governs lease expiry and renewal.",
+    "observed_seconds": 4.21
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_ingest_atomic_retry_and_unsigned_lsn[motherduck]",
+    "reason": "Remote commit ambiguity, retry identity and unsigned LSNs stay exact.",
+    "observed_seconds": 5.62
+  },
+  {
+    "nodeid": "tests/test_phase1.py::test_metadata_preserves_unsigned_lsn[motherduck]",
+    "reason": "Production metadata preserves UBIGINT values above signed 64-bit range; the exact format-2 frame schema (nested NULL/empty images, UINTEGER[], inline COMMIT) survives append's upload and reads back unchanged; the grouped format-2 writer's two-day append, retry, readback and missing-ledger refusal hold remotely, and the snapshot and filtered-read plans keep their scans, filters and counts remote, with only the result crossing; a unit-history day drop is atomic remotely (rolled back before COMMIT, a new connection still sees the day, floor and guard unchanged; committed, a new connection sees it gone, the floor raised and the guard changed) and a fresh log recovers and ingests after it.",
+    "observed_seconds": 46.78
+  },
+  {
+    "nodeid": "tests/test_phase1.py::test_acquire_write_conflict_returns_busy[motherduck]",
+    "reason": "A real database acquisition conflict is reported as busy.",
+    "observed_seconds": 9.96
+  },
+  {
+    "nodeid": "tests/test_publish.py::test_publish_dependency_limits[motherduck]",
+    "reason": "Remote catalog dependency/index restrictions and view behavior are proven.",
+    "observed_seconds": 5.18
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_inflight_guard_conflicts_with_takeover[motherduck]",
+    "reason": "An in-flight guard blocks takeover under real MVCC.",
+    "observed_seconds": 3.89
+  },
+  {
+    "nodeid": "tests/test_protocols.py::test_apply_atomicity[motherduck]",
+    "reason": "MERGE and checkpoint roll back and replay atomically.",
+    "observed_seconds": 9.66
+  },
+  {
+    "nodeid": "tests/test_conftest.py::test_md_template_clone_equals_a_freshly_initialized_store",
+    "reason": "Every remote fixture clone must match a freshly initialized store.",
+    "observed_seconds": 13.82
+  },
+  {
+    "nodeid": "tests/test_ops.py::test_two_sources_and_two_connections_write_cdc_ops_concurrently[motherduck]",
+    "observed_seconds": 17.15,
+    "reason": "Concurrent cdc_ops status writers from two sources and connections both land."
+  }
+]

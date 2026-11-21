@@ -1,0 +1,17 @@
+flowchart TD
+  start{New or resumed generation}:::switch
+  start -->|new| pin[Register the generation pin]:::query
+  start -->|resume| resume{Resume at}:::switch
+  resume -->|scan| scan
+  resume -->|marker| marker
+  resume -->|catch_up| catchup
+  pin --> scan[Snapshot chunks into staging]:::load
+  scan --> marker[Wait for the end marker]:::wait
+  marker --> catchup[Catch up from the change log]:::load
+  catchup --> publish[Publish the generation]:::load
+  publish --> outcome{Run result}:::switch
+  outcome -->|continue| retrigger[Re-trigger this backfill]:::flight
+  outcome -->|published| done(Done):::transform
+  outcome -->|failed| done
+  outcome -->|stopped| done
+  class scan fraction

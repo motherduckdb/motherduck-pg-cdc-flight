@@ -1,0 +1,17 @@
+flowchart TD
+  validate{Check the inputs}:::check
+  validate -->|refused| invalid(Refused: an input is missing, malformed or not used):::transform
+  validate -->|ok| attach[Attach the mirror and the change log]:::query
+  attach --> decide{Read the table and decide}:::check
+  decide -->|refused| refused(Refused: not a poison hold, a stale epoch or LSN, or the confirmation differs):::transform
+  decide -->|already| already(Already quarantined):::transform
+  decide -->|would| preview[Dry run: record the preview]:::load
+  decide -->|act| act[Spend the preview, record the quarantine and return the table to live, in one transaction]:::load
+  act --> outcome{Result}:::check
+  outcome -->|done| done(Quarantined: resync the table next):::transform
+  outcome -->|already| already
+  outcome -->|busy| busy(An apply run holds the table; retry):::transform
+  outcome -->|refused| moved(Refused: no matching preview, or the table changed):::transform
+  whois[Look up who started this run]:::query
+  audit[Copy the result to the operations database]:::load
+  audit --> snapshot[Refresh the operations snapshot, once]:::load

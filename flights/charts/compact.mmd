@@ -1,0 +1,18 @@
+flowchart TD
+  lease{Take the compaction lease}:::check
+  lease -->|busy| busy(Another compaction holds the lease):::transform
+  lease -->|ok| expire{Judge consumers pinning old or over-budget days}:::check
+  expire -->|none| kept(No consumer expires):::transform
+  expire -->|report| reported(Would expire: recorded only, report mode):::transform
+  expire -->|expired| expired(Expired: mirror needs a resync, pin released):::transform
+  expire --> day[Drop a sealed day below every pin]:::load
+  day --> stop{Why the run stopped}:::check
+  stop -->|done| done(Every day is dropped):::transform
+  stop -->|pinned| pinned(A pin still needs the next day):::transform
+  stop -->|not_sealed| open(The next day is not sealed yet):::transform
+  stop -->|no_pins| nopins(No pins yet: nothing may drop):::transform
+  stop -->|held| held(A published table lost its pin):::transform
+  stop -->|capped| capped(Runtime cap; the next run continues):::transform
+  stop -->|busy| conflict(The lease or a concurrent change stopped a day):::transform
+  stop -->|invariant| invariant(Refused: the floor would pass the ingest checkpoint):::transform
+  class day fanout

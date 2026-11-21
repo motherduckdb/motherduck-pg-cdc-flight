@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+artifacts/
+
+# local secrets
+.env.*
+!.env.example
+
+# local notes / agent handoffs
+.notes/
+.notes
+
+# editor / OS
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
+
+# local DuckDB files
+*.duckdb
+*.duckdb.wal
+.dive-preview/

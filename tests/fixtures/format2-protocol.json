@@ -1,0 +1,273 @@
+{
+  "mapping_revision": 1,
+  "cell_tags": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "binding": "6ea5fd00913225eed7aff704989af55044a75b5780c6af9e7f824581cbcee028",
+  "key_layout": "b4b8d147b276f2bb1c220adedf02861d89426af1a474b53b95f00095e9e5737d",
+  "event_wire": "49000000654e00027400000001317400000005c3a90a225c",
+  "commit_wire": "430000000000000000640000000000000065fffffffffffffffc",
+  "event_header": "0100026ea5fd00913225eed7aff704989af55044a75b5780c6af9e7f824581cbcee028000000010000000000000064fffffffffffffffb00000007000000000000000049000000651212121212121212121212121212121212121212121212121212121212121212b4b8d147b276f2bb1c220adedf02861d89426af1a474b53b95f00095e9e5737d0000000000000018",
+  "commit_header": "0200026ea5fd00913225eed7aff704989af55044a75b5780c6af9e7f824581cbcee028000000010000000000000064fffffffffffffffb0000000700000000000000013434343434343434343434343434343434343434343434343434343434343434000000000000001a",
+  "unit_header": "00000000000000176364632d666c696768743a666f726d6174323a756e69746ea5fd00913225eed7aff704989af55044a75b5780c6af9e7f824581cbcee02800000001000000000000005a00000000000000010000000000000064000000000040000000000000000000fa0000000000a0000000000000000013880000000000000001",
+  "arrow_schema": "record_kind: uint8\nunit_start_lsn: uint64\nframe_ordinal: uint64\nsource_epoch: uint32\ncommit_lsn: uint64\nevent_ordinal: uint64\ncommit_ts_us: int64\ntxid: uint32\nrelation_id: uint32\nschema_name: string\ntable_name: string\nschema_version: string\nkey_layout_hash: string\nop: string\nold: struct<values: list<item: string> not null, kinds: list<item: uint8 not null> not null>\n  child 0, values: list<item: string> not null\n      child 0, item: string\n  child 1, kinds: list<item: uint8 not null> not null\n      child 0, item: uint8 not null\nnew: struct<values: list<item: string> not null, kinds: list<item: uint8 not null> not null>\n  child 0, values: list<item: string> not null\n      child 0, item: string\n  child 1, kinds: list<item: uint8 not null> not null\n      child 0, item: uint8 not null\nold_key: struct<values: list<item: string> not null, kinds: list<item: uint8 not null> not null>\n  child 0, values: list<item: string> not null\n      child 0, item: string\n  child 1, kinds: list<item: uint8 not null> not null\n      child 0, item: uint8 not null\nnew_key: struct<values: list<item: string> not null, kinds: list<item: uint8 not null> not null>\n  child 0, values: list<item: string> not null\n      child 0, item: string\n  child 1, kinds: list<item: uint8 not null> not null\n      child 0, item: uint8 not null\nold_tuple_kind: uint8\ntruncate_oids: list<item: uint32>\n  child 0, item: uint32\ntruncate_options: uint8\nend_lsn: uint64\nend_ts_us: int64\ntransaction_digest: string\nwire_length: uint64",
+  "old_tuple_tags": [
+    0,
+    1,
+    2
+  ],
+  "mapping_projections": [
+    {
+      "old": null,
+      "new": {
+        "values": [
+          "",
+          "é\n\"\\",
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          3,
+          1,
+          2
+        ]
+      },
+      "old_key": null,
+      "new_key": {
+        "values": [
+          "",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "old_tuple_kind": 0,
+      "truncate_oids": null,
+      "truncate_options": null
+    },
+    {
+      "old": null,
+      "new": {
+        "values": [
+          "",
+          "é\n\"\\",
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          3,
+          1,
+          2
+        ]
+      },
+      "old_key": null,
+      "new_key": {
+        "values": [
+          "",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "old_tuple_kind": 0,
+      "truncate_oids": null,
+      "truncate_options": null
+    },
+    {
+      "old": {
+        "values": [
+          "key",
+          null,
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          1,
+          1,
+          1
+        ]
+      },
+      "new": {
+        "values": [
+          "",
+          "é\n\"\\",
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          3,
+          1,
+          2
+        ]
+      },
+      "old_key": {
+        "values": [
+          "key",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "new_key": {
+        "values": [
+          "",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "old_tuple_kind": 1,
+      "truncate_oids": null,
+      "truncate_options": null
+    },
+    {
+      "old": {
+        "values": [
+          "old",
+          "full",
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          3,
+          1,
+          2
+        ]
+      },
+      "new": {
+        "values": [
+          "",
+          "é\n\"\\",
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          3,
+          1,
+          2
+        ]
+      },
+      "old_key": {
+        "values": [
+          "old",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "new_key": {
+        "values": [
+          "",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "old_tuple_kind": 2,
+      "truncate_oids": null,
+      "truncate_options": null
+    },
+    {
+      "old": {
+        "values": [
+          "key",
+          null,
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          1,
+          1,
+          1
+        ]
+      },
+      "new": null,
+      "old_key": {
+        "values": [
+          "key",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "new_key": null,
+      "old_tuple_kind": 1,
+      "truncate_oids": null,
+      "truncate_options": null
+    },
+    {
+      "old": {
+        "values": [
+          "old",
+          "full",
+          null,
+          null
+        ],
+        "kinds": [
+          3,
+          3,
+          1,
+          2
+        ]
+      },
+      "new": null,
+      "old_key": {
+        "values": [
+          "old",
+          null
+        ],
+        "kinds": [
+          3,
+          0
+        ]
+      },
+      "new_key": null,
+      "old_tuple_kind": 2,
+      "truncate_oids": null,
+      "truncate_options": null
+    },
+    {
+      "old": null,
+      "new": null,
+      "old_key": null,
+      "new_key": null,
+      "old_tuple_kind": 0,
+      "truncate_oids": [
+        101,
+        102
+      ],
+      "truncate_options": 3
+    }
+  ],
+  "truncate_header": "0100026ea5fd00913225eed7aff704989af55044a75b5780c6af9e7f824581cbcee028000000010000000000000064fffffffffffffffb000000070000000000000007540000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e",
+  "truncate_wire": "5400000002030000006500000066",
+  "truncate_charge": 166,
+  "truncate_logical_ordinals": [
+    7,
+    8
+  ]
+}

@@ -1,0 +1,14 @@
+# gitleaks: the default rules, minus the sha256 digests the tests pin (frozen doc regions in
+# tests/test_docs.py, format-2 golden fixtures). The paths match with or without a leading
+# directory, since `gitleaks dir` reports them under the scanned root. Scan tracked files only:
+#   d=$(mktemp -d) && git archive HEAD | tar -x -C "$d" && docker run --rm -v "$d":/repo:ro \
+#     zricethezav/gitleaks:v8.21.2 dir /repo --config /repo/.gitleaks.toml --redact; rm -rf "$d"
+# It finds nothing, and still finds a secret planted elsewhere.
+title = "motherduck-pg-cdc-flight"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "sha256 digests pinned by tests"
+paths = ['''(^|/)tests/fixtures/format2-[a-z0-9-]+\.json$''', '''(^|/)tests/test_docs\.py$''']

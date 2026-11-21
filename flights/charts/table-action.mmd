@@ -1,0 +1,21 @@
+flowchart TD
+  validate{Check the inputs}:::check
+  validate -->|refused| invalid(Refused: an input is missing, malformed or not used by the action):::transform
+  validate -->|ok| attach[Attach the mirror and the change log]:::query
+  attach --> decide{Read the table and decide}:::check
+  decide -->|refused| refused(Refused: the state or an expected value does not allow it):::transform
+  decide -->|already| already(Nothing to do):::transform
+  decide -->|would| preview[Dry run: record the preview]:::load
+  decide -->|act| act[Spend the preview, change the state and audit, in one transaction]:::load
+  decide -->|trigger| claim[Spend the preview and audit]:::load
+  act --> outcome{Result}:::check
+  claim --> outcome
+  outcome -->|done| done(Done):::transform
+  outcome -->|already| already
+  outcome -->|busy| busy(An apply run holds the table; retry):::transform
+  outcome -->|refused| moved(Refused: no matching preview, or the table changed):::transform
+  outcome -->|trigger| trigger[Start the backfill or compaction Flight]:::flight
+  trigger --> done
+  whois[Look up who started this run]:::query
+  audit[Copy the result to the operations database]:::load
+  audit --> snapshot[Refresh the operations snapshot, once]:::load

@@ -1,0 +1,131 @@
+# PostgreSQL 16 is the default test server. PostgreSQL 13 and 18 are behind the
+# `matrix` profile for the version compatibility matrix (dev-docs/test-map.md, "PostgreSQL version matrix"):
+#   docker compose --profile matrix up -d --wait postgres13 postgres18
+# Slot and WAL sender limits are raised because parallel test runs share a server.
+# Replica capture (docs/read-replica.md) runs against a primary plus a physical streaming standby,
+# for PostgreSQL 16, 17 and 18, behind the `replica` profile (opt-in; tests marked `replica`):
+#   docker compose --profile replica up -d --wait replica16-primary replica16-standby
+# CDC_PG_PORT moves the PostgreSQL 16 host port, so that several servers, each under
+# its own project name (`docker compose -p <name>`), can run side by side:
+#   CDC_PG_PORT=55443 docker compose -p cdc-pg-mine up -d --wait postgres
+x-postgres: &postgres
+  environment:
+    POSTGRES_PASSWORD: phase0-local-only
+    POSTGRES_DB: cdc_phase0
+  command:
+    - postgres
+    - -c
+    - wal_level=logical
+    - -c
+    - max_replication_slots=40
+    - -c
+    - max_wal_senders=40
+  healthcheck:
+    # TCP, not the socket: the entrypoint's init server listens only on the socket.
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d cdc_phase0"]
+    interval: 2s
+    timeout: 5s
+    retries: 30
+
+services:
+  postgres:
+    <<: *postgres
+    image: postgres:16
+    ports:
+      - "127.0.0.1:${CDC_PG_PORT:-55432}:5432"
+  postgres13:
+    <<: *postgres
+    image: postgres:13
+    profiles: [matrix]
+    ports:
+      - "127.0.0.1:55413:5432"
+  postgres18:
+    <<: *postgres
+    image: postgres:18
+    profiles: [matrix]
+    ports:
+      - "127.0.0.1:55418:5432"
+  replica16-primary:
+    <<: *postgres
+    image: postgres:16
+    profiles: [replica]
+    volumes:
+      - ./tests/replica/primary-init.sh:/docker-entrypoint-initdb.d/10-replica.sh:ro
+    ports:
+      - "127.0.0.1:55616:5432"
+  replica16-standby:
+    image: postgres:16
+    profiles: [replica]
+    user: postgres
+    entrypoint: ["/replica/standby.sh"]
+    environment:
+      PRIMARY_HOST: replica16-primary
+      PGDATA: /var/lib/postgresql/standby
+    volumes:
+      - ./tests/replica/standby.sh:/replica/standby.sh:ro
+    depends_on:
+      replica16-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -U postgres -tAc \"SELECT pg_is_in_recovery() AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE status='streaming')\" | grep -qx t"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:55626:5432"
+  replica17-primary:
+    <<: *postgres
+    image: postgres:17
+    profiles: [replica]
+    volumes:
+      - ./tests/replica/primary-init.sh:/docker-entrypoint-initdb.d/10-replica.sh:ro
+    ports:
+      - "127.0.0.1:55617:5432"
+  replica17-standby:
+    image: postgres:17
+    profiles: [replica]
+    user: postgres
+    entrypoint: ["/replica/standby.sh"]
+    environment:
+      PRIMARY_HOST: replica17-primary
+      PGDATA: /var/lib/postgresql/standby
+    volumes:
+      - ./tests/replica/standby.sh:/replica/standby.sh:ro
+    depends_on:
+      replica17-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -U postgres -tAc \"SELECT pg_is_in_recovery() AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE status='streaming')\" | grep -qx t"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:55627:5432"
+  replica18-primary:
+    <<: *postgres
+    image: postgres:18
+    profiles: [replica]
+    volumes:
+      - ./tests/replica/primary-init.sh:/docker-entrypoint-initdb.d/10-replica.sh:ro
+    ports:
+      - "127.0.0.1:55618:5432"
+  replica18-standby:
+    image: postgres:18
+    profiles: [replica]
+    user: postgres
+    entrypoint: ["/replica/standby.sh"]
+    environment:
+      PRIMARY_HOST: replica18-primary
+      PGDATA: /var/lib/postgresql/standby
+    volumes:
+      - ./tests/replica/standby.sh:/replica/standby.sh:ro
+    depends_on:
+      replica18-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -U postgres -tAc \"SELECT pg_is_in_recovery() AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE status='streaming')\" | grep -qx t"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:55628:5432"

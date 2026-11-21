@@ -1,0 +1,17 @@
+flowchart TD
+  validate{Check the inputs}:::check
+  validate -->|refused| invalid(Refused: an input is missing, malformed or not used):::transform
+  validate -->|ok| attach[Attach the change log]:::query
+  attach --> decide{Read the epoch and the slots, and decide}:::check
+  decide -->|refused| refused(Refused: a stale epoch, a different confirmation, nothing to recover or skip, or the source is being deleted):::transform
+  decide -->|would| preview[Dry run: record the preview]:::load
+  decide -->|waiting| waiting(Waiting: ingest or a slot reader is busy, or a bounded wait ran out; nothing changed):::transform
+  decide -->|act| act[Wait for the ingest lease, spend the preview, change the slot, record the epoch]:::load
+  act --> outcome{Result}:::check
+  outcome -->|done| done(Epoch begun: resync every mirror next):::transform
+  outcome -->|already| already(Already begun):::transform
+  outcome -->|waiting| waiting
+  outcome -->|refused| moved(Refused: no matching preview, or the source changed):::transform
+  whois[Look up who started this run]:::query
+  audit[Copy the result to the operations database]:::load
+  audit --> snapshot[Refresh the operations snapshot, once]:::load

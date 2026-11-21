@@ -1,0 +1,13 @@
+flowchart TD
+  preflight[Validate the source]:::check --> held{Configured tables present?}:::check
+  held -->|all| lease{Take the ingest lease}:::check
+  held -->|held| lease
+  lease -->|ok| slot{Slot usable?}:::check
+  lease -->|busy| overlap(Another ingest run holds the lease):::transform
+  slot -->|ok| stream[Stream changes from the slot]:::extract
+  slot -->|busy| busy(A reader holds the slot):::transform
+  stream --> append[Append batches to the change log]:::load
+  append --> finish[Record keys and progress, release the lease]:::query
+  finish --> outcome{Did the checkpoint advance?}:::switch
+  outcome -->|advanced| trigger[Trigger apply]:::flight
+  outcome -->|unchanged| idle(Nothing new to apply):::transform

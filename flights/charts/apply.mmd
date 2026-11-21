@@ -1,0 +1,12 @@
+flowchart TD
+  attach[Attach the change log and mirror]:::query --> table[Apply a table]:::load
+  table --> state{Table state}:::check
+  state -->|current| current(Mirror current):::transform
+  state -->|awaiting_generation| nogen(No generation yet):::transform
+  state -->|needs_resync| resync(Needs a backfill):::transform
+  state -->|needs_action| action(Needs action):::transform
+  state -->|source_missing| missing(Source table missing or removed):::transform
+  state -->|not_configured| omitted(Registered, left out by CDC_TABLES):::transform
+  state -->|paused| paused(Paused by an operator):::transform
+  class table,state fanout
+  class current,nogen,resync,action,missing,omitted,paused fanout

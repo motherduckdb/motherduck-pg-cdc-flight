@@ -1,0 +1,34 @@
+{
+  "name": "pg-cdc-flight-ops-dive",
+  "private": true,
+  "license": "Apache-2.0",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The CDC operations Dive over cdc_ops. `npm run dev` previews it against a local cdc_ops; `npm run bundle` emits the Dive source scripts/deploy_dive.py uploads; `npm run dump-queries` refreshes queries.snapshot.json.",
+  "scripts": {
+    "dev": "vite",
+    "bundle": "tsx scripts/bundle-dive.ts",
+    "dump-queries": "tsx scripts/dump-queries.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test runtime/*.test.ts src/*.test.ts"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "~3.7.0"
+  },
+  "devDependencies": {
+    "@duckdb/node-api": "^1.5.4-r.1",
+    "@types/d3": "^7.4.3",
+    "@types/node": "^22.12.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.0",
+    "vite": "^8.3.5"
+  }
+}

@@ -1,0 +1,1159 @@
+{
+  "version": 1,
+  "note": "Runtime authority per Flight command. Data, checked against the code by tests/test_authority.py; never shipped in a Flight. 'sites' lists every place in a Flight's code that reads a non-config environment value, writes or runs DDL on PostgreSQL, creates a MotherDuck database or schema, or starts another Flight; each site names the commands that execute it. A command's authority is the union of its sites. 'granted' is what its credentials allow today (no narrowing yet); 'enforced' names what actually limits it. Every command that can reach a site's module is either in its 'commands' or in its 'not_executed' with the reason (message sites execute for none).",
+  "commands": {
+    "preflight": {
+      "secrets": [
+        "config",
+        "motherduck_token",
+        "pg_dsn"
+      ],
+      "postgres": {
+        "connect": "replication",
+        "ddl": [
+          "CREATE",
+          "create_publication",
+          "create_slot"
+        ]
+      },
+      "motherduck": {
+        "databases": {
+          "log": "write",
+          "ops": "write"
+        },
+        "create": [
+          "DATABASE",
+          "SCHEMA"
+        ]
+      },
+      "triggers": [],
+      "network": [
+        "postgres",
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token (every database the owner can write); the PostgreSQL role in the DSN secret",
+      "enforced": "the DDL runs only with CDC_CREATE_OBJECTS=1, and only for missing objects; the role's grants (docs/setup.md, the DBA script) limit it further"
+    },
+    "ingest": {
+      "secrets": [
+        "config",
+        "motherduck_token",
+        "pg_dsn"
+      ],
+      "postgres": {
+        "connect": "replication",
+        "ddl": [
+          "INSERT"
+        ]
+      },
+      "motherduck": {
+        "databases": {
+          "log": "write",
+          "ops": "write"
+        },
+        "create": []
+      },
+      "triggers": [
+        {
+          "target": "apply",
+          "source": "config",
+          "key": "CDC_APPLY_FLIGHT_ID"
+        }
+      ],
+      "network": [
+        "postgres",
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token; the PostgreSQL role in the DSN secret",
+      "enforced": "code only: the one PostgreSQL write is the heartbeat upsert; the role's grants on the heartbeat"
+    },
+    "apply": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token"
+      ],
+      "postgres": {
+        "connect": "none",
+        "ddl": []
+      },
+      "motherduck": {
+        "databases": {
+          "log": "read",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": [
+          "DATABASE",
+          "SCHEMA"
+        ]
+      },
+      "triggers": [],
+      "network": [
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token",
+      "enforced": "code only; no PostgreSQL secret is attached"
+    },
+    "backfill": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token",
+        "pg_dsn"
+      ],
+      "postgres": {
+        "connect": "replication",
+        "ddl": [
+          "INSERT",
+          "replication_slot"
+        ]
+      },
+      "motherduck": {
+        "databases": {
+          "log": "read",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": [
+          "DATABASE",
+          "SCHEMA"
+        ]
+      },
+      "triggers": [
+        {
+          "target": "backfill",
+          "source": "runtime",
+          "key": "MOTHERDUCK_FLIGHT_ID"
+        }
+      ],
+      "network": [
+        "postgres",
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token; the PostgreSQL role in the DSN secret",
+      "enforced": "code only: the heartbeat marker upsert and an append table's temporary snapshot slot; the self-trigger id is the runtime's, never config"
+    },
+    "compact": {
+      "secrets": [
+        "config",
+        "motherduck_token"
+      ],
+      "postgres": {
+        "connect": "none",
+        "ddl": []
+      },
+      "motherduck": {
+        "databases": {
+          "log": "write",
+          "mirror": "read",
+          "ops": "write"
+        },
+        "create": []
+      },
+      "triggers": [],
+      "network": [
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token",
+      "enforced": "code only; no PostgreSQL secret is attached"
+    },
+    "table-action": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token",
+        "run_id"
+      ],
+      "postgres": {
+        "connect": "none",
+        "ddl": []
+      },
+      "motherduck": {
+        "databases": {
+          "log": "read",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": [
+          "SCHEMA"
+        ]
+      },
+      "triggers": [
+        {
+          "target": "backfill",
+          "source": "owner",
+          "key": "backfill_flight"
+        },
+        {
+          "target": "compact",
+          "source": "owner",
+          "key": "compact_flight"
+        }
+      ],
+      "network": [
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token",
+      "enforced": "owner-only (no RUN grants; scripts/deploy_dive.py --flights refuses a grant when the Dive is deployed); trigger targets are baked OWNER settings, not config"
+    },
+    "table-membership": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token",
+        "pg_dsn",
+        "run_id"
+      ],
+      "postgres": {
+        "connect": "catalog",
+        "ddl": []
+      },
+      "motherduck": {
+        "databases": {
+          "log": "write",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": [
+          "SCHEMA"
+        ]
+      },
+      "triggers": [
+        {
+          "target": "backfill",
+          "source": "owner",
+          "key": "backfill_flight"
+        }
+      ],
+      "network": [
+        "postgres",
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token; the PostgreSQL role in the secret OWNER.dsn_env names (the replication role by default)",
+      "enforced": "owner-only (no RUN grants); it only reads the PostgreSQL catalog and prints the DBA's ALTER PUBLICATION; the trigger target is a baked OWNER setting"
+    },
+    "quarantine": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token",
+        "run_id"
+      ],
+      "postgres": {
+        "connect": "none",
+        "ddl": []
+      },
+      "motherduck": {
+        "databases": {
+          "log": "read",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": [
+          "SCHEMA"
+        ]
+      },
+      "triggers": [],
+      "network": [
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token",
+      "enforced": "owner-only (no RUN grants); a typed confirmation of the unit"
+    },
+    "epoch": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token",
+        "pg_dsn",
+        "run_id"
+      ],
+      "postgres": {
+        "connect": "replication",
+        "ddl": [
+          "advance_slot",
+          "create_slot",
+          "drop_slot"
+        ]
+      },
+      "motherduck": {
+        "databases": {
+          "log": "write",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": []
+      },
+      "triggers": [],
+      "network": [
+        "postgres",
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token; the PostgreSQL role in the secret OWNER.dsn_env names",
+      "enforced": "owner-only (no RUN grants); a typed confirmation; only this database's inactive pgoutput slots are dropped"
+    },
+    "delete-source": {
+      "secrets": [
+        "config",
+        "flight_id",
+        "motherduck_token",
+        "pg_dsn",
+        "run_id"
+      ],
+      "postgres": {
+        "connect": "replication",
+        "ddl": [
+          "DROP",
+          "drop_publication",
+          "drop_slot"
+        ]
+      },
+      "motherduck": {
+        "databases": {
+          "log": "write",
+          "mirror": "write",
+          "ops": "write"
+        },
+        "create": []
+      },
+      "triggers": [],
+      "network": [
+        "postgres",
+        "motherduck",
+        "github_install"
+      ],
+      "granted": "the owner's MotherDuck token; the PostgreSQL role in the secret OWNER.dsn_env names",
+      "enforced": "owner-only (no RUN grants); a typed confirmation; it drops only objects its own preflight recorded as created"
+    }
+  },
+  "principals": {
+    "dive": {
+      "starts": [
+        "table-action",
+        "table-membership",
+        "quarantine"
+      ],
+      "as": "the viewer",
+      "enforced": "the Flights are owner-only, so only the owner's Dive session can start them; other viewers see a read-only Dive (docs/dive.md)"
+    },
+    "deploy_dive": {
+      "starts": [],
+      "as": "the owner, from a laptop",
+      "enforced": "with --flights it refuses an action Flight that has a RUN grant to anyone else; a grant added later isn't detected"
+    }
+  },
+  "implicit_reads": {
+    "libpq": "PG* environment variables (none are set by the Flights; the DSN is passed explicitly)",
+    "duckdb": "motherduck_token / MOTHERDUCK_TOKEN, read by the md: connection itself"
+  },
+  "secret_slots": {
+    "config": "declared CDC_ config keys, read by a computed key (chain's typed readers, action inputs, blank_to_unset)",
+    "motherduck_token": "the runtime's MotherDuck token",
+    "pg_dsn": "the PostgreSQL DSN, from the variable CDC_DSN_ENV or OWNER.dsn_env names",
+    "flight_id": "the runtime's MOTHERDUCK_FLIGHT_ID",
+    "run_id": "the runtime's MOTHERDUCK_FLIGHT_RUN_ID"
+  },
+  "sites": [
+    {
+      "kind": "env",
+      "module": "action_base",
+      "function": "parse",
+      "token": "<key>",
+      "slot": "config",
+      "effect": "reads",
+      "commands": [
+        "delete-source",
+        "epoch",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "action_base",
+      "function": "run_id_from",
+      "token": "MOTHERDUCK_FLIGHT_RUN_ID",
+      "slot": "run_id",
+      "effect": "reads",
+      "commands": [
+        "delete-source",
+        "epoch",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "action_base",
+      "function": "whois",
+      "token": "MOTHERDUCK_FLIGHT_ID",
+      "slot": "flight_id",
+      "effect": "reads",
+      "commands": [
+        "delete-source",
+        "epoch",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "action_base",
+      "function": "whois",
+      "token": "MOTHERDUCK_FLIGHT_RUN_ID",
+      "slot": "run_id",
+      "effect": "reads",
+      "commands": [
+        "delete-source",
+        "epoch",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "attach",
+      "function": "attach_motherduck",
+      "token": "MOTHERDUCK_TOKEN",
+      "slot": "motherduck_token",
+      "effect": "reads",
+      "commands": [
+        "apply",
+        "backfill",
+        "compact",
+        "delete-source",
+        "epoch",
+        "ingest",
+        "preflight",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "attach",
+      "function": "attach_motherduck",
+      "token": "motherduck_token",
+      "slot": "motherduck_token",
+      "effect": "reads",
+      "commands": [
+        "apply",
+        "backfill",
+        "compact",
+        "delete-source",
+        "epoch",
+        "ingest",
+        "preflight",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "chain",
+      "function": "BackfillChain.from_env",
+      "token": "<k>",
+      "slot": "config",
+      "effect": "reads",
+      "commands": [
+        "backfill"
+      ],
+      "not_executed": {
+        "apply": "only backfill_main builds the backfill chain",
+        "compact": "only backfill_main builds the backfill chain",
+        "delete-source": "only backfill_main builds the backfill chain",
+        "epoch": "only backfill_main builds the backfill chain",
+        "ingest": "only backfill_main builds the backfill chain",
+        "preflight": "only backfill_main builds the backfill chain",
+        "quarantine": "only backfill_main builds the backfill chain",
+        "table-action": "only backfill_main builds the backfill chain",
+        "table-membership": "only backfill_main builds the backfill chain"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "chain",
+      "function": "BackfillChain.from_env",
+      "token": "MOTHERDUCK_FLIGHT_ID",
+      "slot": "flight_id",
+      "effect": "reads",
+      "commands": [
+        "backfill"
+      ],
+      "note": "the self-trigger target",
+      "not_executed": {
+        "apply": "only backfill_main builds the backfill chain",
+        "compact": "only backfill_main builds the backfill chain",
+        "delete-source": "only backfill_main builds the backfill chain",
+        "epoch": "only backfill_main builds the backfill chain",
+        "ingest": "only backfill_main builds the backfill chain",
+        "preflight": "only backfill_main builds the backfill chain",
+        "quarantine": "only backfill_main builds the backfill chain",
+        "table-action": "only backfill_main builds the backfill chain",
+        "table-membership": "only backfill_main builds the backfill chain"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "chain",
+      "function": "blank_to_unset",
+      "token": "<key>",
+      "slot": "config",
+      "effect": "reads",
+      "commands": [
+        "apply",
+        "backfill",
+        "compact",
+        "delete-source",
+        "epoch",
+        "ingest",
+        "preflight",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ],
+      "note": "deletes blank CDC_ keys only"
+    },
+    {
+      "kind": "env",
+      "module": "chain",
+      "function": "flag",
+      "token": "<key>",
+      "slot": "config",
+      "effect": "reads",
+      "commands": [
+        "backfill",
+        "ingest"
+      ],
+      "not_executed": {
+        "apply": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "compact": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "delete-source": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "epoch": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "preflight": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "quarantine": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "table-action": "only the ingest and backfill chains (and backfill_main) read typed config",
+        "table-membership": "only the ingest and backfill chains (and backfill_main) read typed config"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "chain",
+      "function": "flight_id",
+      "token": "<key>",
+      "slot": "config",
+      "effect": "reads",
+      "commands": [
+        "backfill",
+        "ingest"
+      ],
+      "not_executed": {
+        "apply": "only the ingest and backfill chains read a Flight id",
+        "compact": "only the ingest and backfill chains read a Flight id",
+        "delete-source": "only the ingest and backfill chains read a Flight id",
+        "epoch": "only the ingest and backfill chains read a Flight id",
+        "preflight": "only the ingest and backfill chains read a Flight id",
+        "quarantine": "only the ingest and backfill chains read a Flight id",
+        "table-action": "only the ingest and backfill chains read a Flight id",
+        "table-membership": "only the ingest and backfill chains read a Flight id"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "chain",
+      "function": "integer",
+      "token": "<key>",
+      "slot": "config",
+      "effect": "reads",
+      "commands": [
+        "backfill"
+      ],
+      "not_executed": {
+        "apply": "only the backfill chain reads integer config",
+        "compact": "only the backfill chain reads integer config",
+        "delete-source": "only the backfill chain reads integer config",
+        "epoch": "only the backfill chain reads integer config",
+        "ingest": "only the backfill chain reads integer config",
+        "preflight": "only the backfill chain reads integer config",
+        "quarantine": "only the backfill chain reads integer config",
+        "table-action": "only the backfill chain reads integer config",
+        "table-membership": "only the backfill chain reads integer config"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "cli",
+      "function": "require_token",
+      "token": "MOTHERDUCK_TOKEN",
+      "slot": "motherduck_token",
+      "effect": "reads",
+      "commands": [
+        "apply",
+        "backfill",
+        "compact",
+        "delete-source",
+        "epoch",
+        "ingest",
+        "preflight",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "cli",
+      "function": "require_token",
+      "token": "motherduck_token",
+      "slot": "motherduck_token",
+      "effect": "reads",
+      "commands": [
+        "apply",
+        "backfill",
+        "compact",
+        "delete-source",
+        "epoch",
+        "ingest",
+        "preflight",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "config",
+      "function": "BackfillConfig.from_env",
+      "token": "<secret_key>",
+      "slot": "pg_dsn",
+      "effect": "reads",
+      "commands": [
+        "backfill"
+      ],
+      "not_executed": {
+        "apply": "only backfill_main builds a BackfillConfig",
+        "compact": "only backfill_main builds a BackfillConfig",
+        "delete-source": "only backfill_main builds a BackfillConfig",
+        "epoch": "only backfill_main builds a BackfillConfig",
+        "ingest": "only backfill_main builds a BackfillConfig",
+        "preflight": "only backfill_main builds a BackfillConfig",
+        "quarantine": "only backfill_main builds a BackfillConfig",
+        "table-action": "only backfill_main builds a BackfillConfig",
+        "table-membership": "only backfill_main builds a BackfillConfig"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "config",
+      "function": "IngestConfig.from_env",
+      "token": "<secret_key>",
+      "slot": "pg_dsn",
+      "effect": "reads",
+      "commands": [
+        "ingest",
+        "preflight"
+      ],
+      "not_executed": {
+        "apply": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "backfill": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "compact": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "delete-source": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "epoch": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "quarantine": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "table-action": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env",
+        "table-membership": "only preflight and ingest build an IngestConfig; action Flights read OWNER.dsn_env"
+      }
+    },
+    {
+      "kind": "env",
+      "module": "delete_source_flight",
+      "function": "main",
+      "token": "<owner.dsn_env>",
+      "slot": "pg_dsn",
+      "effect": "reads",
+      "commands": [
+        "delete-source"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "epoch_flight",
+      "function": "main",
+      "token": "<owner.dsn_env>",
+      "slot": "pg_dsn",
+      "effect": "reads",
+      "commands": [
+        "epoch"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "membership_flight",
+      "function": "main.pg",
+      "token": "<owner.dsn_env>",
+      "slot": "pg_dsn",
+      "effect": "reads",
+      "commands": [
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "env",
+      "module": "releases",
+      "function": "record_release",
+      "token": "MOTHERDUCK_FLIGHT_ID",
+      "slot": "flight_id",
+      "effect": "reads",
+      "commands": [
+        "apply",
+        "backfill",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ]
+    },
+    {
+      "kind": "md_create",
+      "module": "apply",
+      "function": "Apply.mirror_statements",
+      "token": "SCHEMA",
+      "effect": "executes",
+      "commands": [
+        "apply",
+        "backfill",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ],
+      "not_executed": {
+        "compact": "compact never calls Apply.initialize (it initializes retention only)"
+      }
+    },
+    {
+      "kind": "md_create",
+      "module": "apply",
+      "function": "create_mirror_table",
+      "token": "SCHEMA",
+      "effect": "executes",
+      "commands": [
+        "apply",
+        "backfill",
+        "quarantine",
+        "table-action",
+        "table-membership"
+      ],
+      "not_executed": {
+        "compact": "compact never calls Apply.initialize (it initializes retention only)"
+      }
+    },
+    {
+      "kind": "md_create",
+      "module": "cli",
+      "function": "apply_main",
+      "token": "DATABASE",
+      "effect": "executes",
+      "commands": [
+        "apply"
+      ],
+      "not_executed": {
+        "backfill": "not its entry function",
+        "compact": "not its entry function",
+        "delete-source": "not its entry function",
+        "epoch": "not its entry function",
+        "ingest": "not its entry function",
+        "preflight": "not its entry function",
+        "quarantine": "not its entry function",
+        "table-action": "not its entry function",
+        "table-membership": "not its entry function"
+      }
+    },
+    {
+      "kind": "md_create",
+      "module": "cli",
+      "function": "backfill_main",
+      "token": "DATABASE",
+      "effect": "executes",
+      "commands": [
+        "backfill"
+      ],
+      "not_executed": {
+        "apply": "not its entry function",
+        "compact": "not its entry function",
+        "delete-source": "not its entry function",
+        "epoch": "not its entry function",
+        "ingest": "not its entry function",
+        "preflight": "not its entry function",
+        "quarantine": "not its entry function",
+        "table-action": "not its entry function",
+        "table-membership": "not its entry function"
+      }
+    },
+    {
+      "kind": "md_create",
+      "module": "cli",
+      "function": "main",
+      "token": "DATABASE",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "not_executed": {
+        "apply": "only the preflight command creates the log database (cli.main checks args.command)",
+        "backfill": "only the preflight command creates the log database (cli.main checks args.command)",
+        "compact": "only the preflight command creates the log database (cli.main checks args.command)",
+        "delete-source": "only the preflight command creates the log database (cli.main checks args.command)",
+        "epoch": "only the preflight command creates the log database (cli.main checks args.command)",
+        "ingest": "only the preflight command creates the log database (cli.main checks args.command)",
+        "quarantine": "only the preflight command creates the log database (cli.main checks args.command)",
+        "table-action": "only the preflight command creates the log database (cli.main checks args.command)",
+        "table-membership": "only the preflight command creates the log database (cli.main checks args.command)"
+      }
+    },
+    {
+      "kind": "md_create",
+      "module": "ingest_log2",
+      "function": "IngestLog2.initialize",
+      "token": "SCHEMA",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "not_executed": {
+        "delete-source": "opens the existing store; only preflight's bootstrap creates it (open_log create=True)",
+        "epoch": "opens the existing store; only preflight's bootstrap creates it (open_log create=True)",
+        "ingest": "opens the existing store; only preflight's bootstrap creates it (open_log create=True)",
+        "table-membership": "opens the existing store; only preflight's bootstrap creates it (open_log create=True)"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "append_backfill",
+      "function": "_create_slot",
+      "token": "replication_slot",
+      "effect": "executes",
+      "commands": [
+        "backfill"
+      ],
+      "note": "a TEMPORARY slot for an append table's exact snapshot"
+    },
+    {
+      "kind": "pg_write",
+      "module": "standby_backfill",
+      "function": "_create_export_slot",
+      "token": "replication_slot",
+      "effect": "executes",
+      "commands": [
+        "backfill"
+      ],
+      "note": "a TEMPORARY export slot for an append table's snapshot on a standby: reachable at run time; the scan missed it (it followed CUT, not CUT_ALWAYS) until bundles were removed"
+    },
+    {
+      "kind": "pg_write",
+      "module": "backfill",
+      "function": "Backfill.write_marker",
+      "token": "INSERT",
+      "effect": "executes",
+      "commands": [
+        "backfill"
+      ],
+      "note": "the heartbeat marker upsert"
+    },
+    {
+      "kind": "pg_write",
+      "module": "delete_source",
+      "function": "_drop",
+      "token": "DROP",
+      "effect": "executes",
+      "commands": [
+        "delete-source"
+      ],
+      "note": "the heartbeat table, if this source created it"
+    },
+    {
+      "kind": "pg_write",
+      "module": "delete_source",
+      "function": "_drop",
+      "token": "drop_publication",
+      "effect": "executes",
+      "commands": [
+        "delete-source"
+      ]
+    },
+    {
+      "kind": "pg_write",
+      "module": "delete_source",
+      "function": "_drop",
+      "token": "drop_slot",
+      "effect": "executes",
+      "commands": [
+        "delete-source"
+      ]
+    },
+    {
+      "kind": "pg_write",
+      "module": "delete_source",
+      "function": "observe",
+      "token": "drop_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the plan text shown to the owner"
+    },
+    {
+      "kind": "pg_write",
+      "module": "delete_source",
+      "function": "observe",
+      "token": "drop_slot",
+      "effect": "message",
+      "commands": [],
+      "note": "the plan text shown to the owner"
+    },
+    {
+      "kind": "pg_write",
+      "module": "epoch",
+      "function": "_advance",
+      "token": "advance_slot",
+      "effect": "executes",
+      "commands": [
+        "epoch"
+      ],
+      "not_executed": {
+        "ingest": "the ingest and preflight Flights never run the new-epoch CLI subcommand; recover and skip are the epoch Flight's",
+        "preflight": "the ingest and preflight Flights never run the new-epoch CLI subcommand; recover and skip are the epoch Flight's"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "epoch",
+      "function": "_drop_quietly",
+      "token": "drop_slot",
+      "effect": "executes",
+      "commands": [
+        "epoch"
+      ],
+      "not_executed": {
+        "ingest": "the ingest and preflight Flights never run the new-epoch CLI subcommand; recover and skip are the epoch Flight's",
+        "preflight": "the ingest and preflight Flights never run the new-epoch CLI subcommand; recover and skip are the epoch Flight's"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "epoch",
+      "function": "_recreate",
+      "token": "create_slot",
+      "effect": "executes",
+      "commands": [
+        "epoch"
+      ],
+      "not_executed": {
+        "ingest": "the ingest and preflight Flights never run the new-epoch CLI subcommand; recover and skip are the epoch Flight's",
+        "preflight": "the ingest and preflight Flights never run the new-epoch CLI subcommand; recover and skip are the epoch Flight's"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "ingest",
+      "function": "_run_once",
+      "token": "INSERT",
+      "effect": "executes",
+      "commands": [
+        "ingest"
+      ],
+      "note": "the heartbeat upsert",
+      "not_executed": {
+        "preflight": "preflight returns before the ingest loop"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "membership",
+      "function": "_publish_statement",
+      "token": "alter_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the DBA's statement, printed"
+    },
+    {
+      "kind": "pg_write",
+      "module": "membership",
+      "function": "add_table.action",
+      "token": "alter_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the DBA's statement, in a refusal"
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "add_tables",
+      "token": "alter_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the owner's ALTER PUBLICATION, in a refusal"
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "check",
+      "token": "alter_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "a hold reason's text"
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "check",
+      "token": "create_slot",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "note": "only with create_objects (bootstrap); ingest, table-membership, epoch and delete-source call check without it",
+      "not_executed": {
+        "delete-source": "calls check without create_objects (only preflight's bootstrap passes it)",
+        "epoch": "calls check without create_objects (only preflight's bootstrap passes it)",
+        "ingest": "calls check without create_objects (only preflight's bootstrap passes it)",
+        "table-membership": "calls check without create_objects (only preflight's bootstrap passes it)"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "check",
+      "token": "drop_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the owner's statements for a FOR ALL TABLES publication, in a refusal"
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "ddl_plan",
+      "token": "CREATE",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "note": "the heartbeat table; executed by check with create_objects, otherwise printed for the DBA",
+      "not_executed": {
+        "delete-source": "without create_objects the plan is only printed for the DBA",
+        "epoch": "without create_objects the plan is only printed for the DBA",
+        "ingest": "without create_objects the plan is only printed for the DBA",
+        "table-membership": "without create_objects the plan is only printed for the DBA"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "ddl_plan",
+      "token": "create_publication",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "not_executed": {
+        "delete-source": "without create_objects the plan is only printed for the DBA",
+        "epoch": "without create_objects the plan is only printed for the DBA",
+        "ingest": "without create_objects the plan is only printed for the DBA",
+        "table-membership": "without create_objects the plan is only printed for the DBA"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "ddl_plan",
+      "token": "create_slot",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "not_executed": {
+        "delete-source": "without create_objects the plan is only printed for the DBA",
+        "epoch": "without create_objects the plan is only printed for the DBA",
+        "ingest": "without create_objects the plan is only printed for the DBA",
+        "table-membership": "without create_objects the plan is only printed for the DBA"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "preflight",
+      "function": "membership_plan",
+      "token": "alter_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the owner's statements to fix the first registration's members, in a refusal"
+    },
+    {
+      "kind": "pg_write",
+      "module": "standby",
+      "function": "adopted_slot_warning",
+      "token": "drop_slot",
+      "effect": "message",
+      "commands": [],
+      "note": "the drop for a reused standby slot, in a warning"
+    },
+    {
+      "kind": "pg_write",
+      "module": "standby",
+      "function": "create_standby_slot",
+      "token": "create_slot",
+      "effect": "executes",
+      "commands": [
+        "preflight"
+      ],
+      "note": "external mode only, with create_objects (bootstrap, under the bounded wait); a standby slot",
+      "not_executed": {
+        "delete-source": "the external-mode slot is created only by preflight with create_objects (bootstrap)",
+        "epoch": "the external-mode slot is created only by preflight with create_objects (bootstrap)",
+        "ingest": "the external-mode slot is created only by preflight with create_objects (bootstrap)",
+        "table-membership": "never runs a preflight; it reaches standby only through imports it never calls"
+      }
+    },
+    {
+      "kind": "pg_write",
+      "module": "standby",
+      "function": "primary_setup_sql",
+      "token": "create_publication",
+      "effect": "message",
+      "commands": [],
+      "note": "the DBA's SQL to run on the primary, in a refusal"
+    },
+    {
+      "kind": "run_flight",
+      "module": "chain",
+      "function": "run_flight",
+      "token": "MD_RUN_FLIGHT",
+      "effect": "executes",
+      "commands": [
+        "backfill",
+        "ingest",
+        "table-action",
+        "table-membership"
+      ],
+      "not_executed": {
+        "apply": "no trigger target: no *_FLIGHT_ID config, Owner *_flight setting or chain",
+        "compact": "no trigger target: no *_FLIGHT_ID config, Owner *_flight setting or chain",
+        "delete-source": "no trigger target: no *_FLIGHT_ID config, Owner *_flight setting or chain",
+        "epoch": "no trigger target: no *_FLIGHT_ID config, Owner *_flight setting or chain",
+        "preflight": "no trigger target: no *_FLIGHT_ID config, Owner *_flight setting or chain",
+        "quarantine": "no trigger target: no *_FLIGHT_ID config, Owner *_flight setting or chain"
+      }
+    }
+  ]
+}

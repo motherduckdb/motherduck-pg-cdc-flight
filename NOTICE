@@ -1,0 +1,13 @@
+motherduck-pg-cdc-flight
+Copyright 2026 MotherDuck
+
+This product includes software developed at MotherDuck (https://motherduck.com/).
+
+Files in dive/ adapted from md-migration-assessment
+(https://github.com/motherduckdb/md-migration-assessment), licensed under the Apache
+License, Version 2.0, carry this notice from that project:
+
+  md-migration-assessment
+  Copyright 2026 MotherDuck
+
+  This product includes software developed at MotherDuck (https://motherduck.com/).
