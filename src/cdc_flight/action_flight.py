@@ -1,7 +1,7 @@
 """Action Flights: the framework, and the table-action Flight.
 
-Every org member can run an action Flight, and a run may override any key the
-Flight declares. So an action Flight declares only its action's inputs (KEYS). The
+Only the Flights' owner runs an action Flight (no RUN grants; deploy refuses grantees),
+and a run may override any key the Flight declares. So an action Flight declares only its action's inputs (KEYS). The
 owner's settings (the source, its databases, the Flights it may start) are baked into
 the Flight's stub as OWNER at build time and read from nothing else: no runner key can name
 a database, a table list, a threshold or a target Flight (M3 by construction).
@@ -21,7 +21,7 @@ A run:
 5. after the audit copy is written, one best-effort CREATE SNAPSHOT of the operations
    database, whatever the status, so the Dive sees a dry run's preview or a refusal at once.
 
-The guards stop mis-clicks and stale screens, not an org member who means it.
+The guards stop mis-clicks and stale screens, not an owner who means it.
 """
 
 import json

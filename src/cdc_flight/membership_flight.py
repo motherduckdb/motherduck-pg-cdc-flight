@@ -7,7 +7,7 @@ holds it. Everything else follows action_flight's framework:
 - the owner's settings (source, slot, publication, heartbeat, the secret's variable
   name, databases, the backfill Flight) are baked into the stub as OWNER;
 - the Flight declares only CDC_ACTION, CDC_TABLE, CDC_FORCE, CDC_CONFIRM, CDC_MODE,
-  CDC_IGNORE_DELETES, CDC_DRY_RUN and CDC_PREVIEW_ID, checked before any connection
+  CDC_IGNORE_DELETES, CDC_DRY_RUN, CDC_PREVIEW_ID and CDC_REQUEST_ID, checked before any connection
   (CDC_MODE=append, with CDC_IGNORE_DELETES=1 optional: insert-only capture of a keyless
   table, which starts no backfill);
 - a dry run reads (PostgreSQL included, for add) and records a preview in

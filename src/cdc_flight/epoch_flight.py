@@ -1,7 +1,7 @@
 """The epoch Flight: recover a lost slot, or skip to an LSN.
 
-The destructive tier, in its own Flight, granted to the org: every guard here stops
-mis-clicks and stale screens, not an org member who means it. It wraps epoch.begin_epoch:
+The destructive tier, in its own Flight, run by its owner only: every guard here stops
+mis-clicks and stale screens, not an owner who means it. It wraps epoch.begin_epoch:
 
 - the owner's settings (source, slot, publication, heartbeat, the secret's *name*,
   databases) are baked in as OWNER; the Flight declares only CDC_ACTION
