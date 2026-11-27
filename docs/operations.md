@@ -730,7 +730,10 @@ older than a day.
 The preview is a hash over:
 - the action;
 - the table;
-- the parsed inputs (LSNs as numbers, so `0/5a` and `0/5A` match);
+- the parsed inputs (LSNs as numbers, so `0/5a` and `0/5A` match), except accept-types'
+  `CDC_CONFIRM`: its dry run returns the literal and only the real run sends it. The
+  literal's digest and the `type_digest` decision field bind the change. Every other
+  confirmation is hashed, so a real run repeats its dry run's text exactly;
 - the action's **decision fields** as read:
 
 | Action | Decision fields |
