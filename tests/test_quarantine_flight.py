@@ -164,6 +164,7 @@ def test_a_dry_run_then_the_matching_real_run_quarantines_the_poison_commit(stor
     env = env_for(h)
     would = go(h, dry_run="1", **env)
     assert would["status"] == "would" and "may diverge until a resync" in would["detail"]
+    assert would["confirm"] == env["confirm"]  # the literal the real run repeats
     assert row(h, OTHER_T)[0] == "needs_action" and quarantine_rows(h) == []
     done = go(h, preview_id=would["preview_id"], actor="flight:test (started by alice)", **env)
     assert done["status"] == "done" and done["next_steps"] == [f"resync {OTHER_T}"], done

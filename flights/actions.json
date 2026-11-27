@@ -12,6 +12,8 @@
   "preview_minutes": 15,
   "request_id_pattern": "[A-Za-z0-9_-]{1,64}",
   "framework_keys": ["CDC_ACTION", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+  "result_envelope": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
+  "would_fields": ["preview_id", "confirm"],
   "exit_codes": {"would": 0, "done": 0, "already": 0, "waiting": 0, "refused": 2, "busy": 3, "failed": 1},
   "lsn_text": "X/Y: the high and low 32 bits in uppercase hex, no leading zeros (0/5a is written 0/5A)",
   "lsn_keys": [
@@ -54,7 +56,7 @@
       "postgres": false,
       "statuses": ["would", "done", "already", "refused", "busy", "failed"],
       "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
-      "result_extras": ["preview_id", "triggered", "remaining"],
+      "result_extras": ["preview_id", "confirm", "triggered", "remaining"],
       "actions": {
         "pause": {"required": ["CDC_TABLE", "CDC_EXPECTED_STATE"], "optional": [], "confirm": "none", "triggers": null,
           "decision_fields": ["state", "generation", "epoch", "format_version", "generation_id"]},
@@ -85,7 +87,7 @@
       "postgres": false,
       "statuses": ["would", "done", "already", "refused", "busy"],
       "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
-      "result_extras": ["preview_id"],
+      "result_extras": ["preview_id", "confirm"],
       "actions": {
         "quarantine": {"required": ["CDC_TABLE", "CDC_EXPECTED_EPOCH", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
           "literal": "QUARANTINE {table} UNIT {epoch} {unit_start_lsn}..{unit_end_lsn}", "triggers": null,
@@ -99,8 +101,8 @@
       "previews": "cdc_internal.<source>.previews",
       "postgres": true,
       "statuses": ["would", "done", "already", "refused", "busy", "failed"],
-      "result_fields": ["status", "action", "table", "result", "detail", "next_steps", "observed", "run_id"],
-      "result_extras": ["preview_id", "triggered"],
+      "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id", "result"],
+      "result_extras": ["preview_id", "confirm", "triggered"],
       "actions": {
         "add": {"required": ["CDC_TABLE"], "optional": ["CDC_MODE", "CDC_IGNORE_DELETES"], "confirm": "none",
           "requires": {"CDC_IGNORE_DELETES=1": "CDC_MODE=append"}, "triggers": "backfill",
@@ -117,8 +119,8 @@
       "previews": "cdc_internal.<source>.previews",
       "postgres": true,
       "statuses": ["would", "done", "already", "refused", "waiting"],
-      "result_fields": ["status", "action", "detail", "next_steps", "observed", "run_id"],
-      "result_extras": ["preview_id", "epoch", "slot", "start_lsn", "abandoned", "abandoned_bytes_effective", "requested_to_lsn", "clamped", "leftover_slot", "pending_slot", "abandoned_unit_start_lsn", "abandoned_frame_end", "abandoned_chunk_count", "abandoned_first_commit_lsn", "abandoned_last_commit_lsn", "abandoned_active_commit_lsn", "abandoned_into_epoch", "abandoned_reason"],
+      "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
+      "result_extras": ["preview_id", "confirm", "epoch", "slot", "start_lsn", "abandoned", "abandoned_bytes_effective", "requested_to_lsn", "clamped", "leftover_slot", "pending_slot", "abandoned_unit_start_lsn", "abandoned_frame_end", "abandoned_chunk_count", "abandoned_first_commit_lsn", "abandoned_last_commit_lsn", "abandoned_active_commit_lsn", "abandoned_into_epoch", "abandoned_reason"],
       "actions": {
         "recover-slot": {"required": ["CDC_EXPECTED_EPOCH", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
           "literal": "RECOVER {source} EPOCH {next_epoch}", "triggers": null,
@@ -135,8 +137,8 @@
       "previews": "cdc_internal.<source>.previews",
       "postgres": true,
       "statuses": ["would", "done", "already", "refused", "waiting"],
-      "result_fields": ["status", "action", "detail", "run_id"],
-      "result_extras": ["preview_id", "lifecycle", "drop", "dba", "retained_bytes", "dropped", "next_steps"],
+      "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
+      "result_extras": ["preview_id", "confirm", "lifecycle", "drop", "dba", "retained_bytes", "dropped"],
       "actions": {
         "delete-source": {"required": ["CDC_EXPECTED_EPOCH", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
           "literal": "DELETE {source}", "triggers": null,

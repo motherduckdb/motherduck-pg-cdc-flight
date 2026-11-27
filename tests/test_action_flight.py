@@ -332,6 +332,7 @@ def test_a_dry_run_writes_only_its_preview_and_takes_no_lease(stores, tmp_path):
     run = Run()
     out = go(h, run=run, action="pause", table=ITEMS_T, expected_state="live", dry_run="1")
     assert out["status"] == "would" and out["preview_id"] == out["run_id"]
+    assert out["confirm"] is None  # pause takes no confirmation
     assert out["observed"]["token"] == before[3]  # shown for the Dive, never hashed
     assert row(h, ITEMS_T) == before  # no lease: the token is unchanged
     assert mirror_sql(h, "SELECT count(*) FROM {m}runs").fetchone() == runs
@@ -1076,6 +1077,7 @@ def test_accept_types_real_run_spends_the_preview_of_a_dry_run_without_the_confi
     out = go(h, action="accept-types", table=ITEMS_T, dry_run="1")
     assert out["status"] == "would", out
     text = out["observed"]["confirm"]
+    assert out["confirm"] == text  # top level too; observed keeps it for older readers
     wrong = go(
         h,
         action="accept-types",

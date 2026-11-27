@@ -162,6 +162,9 @@ def test_a_pre_p5b_source_drops_nothing_and_prints_the_ddl(stores, populated):  
     assert run_once(ingest, log).status == "drained"
     would = go(populated, dry_run="1", **delete(ingest))
     assert would["status"] == "would" and would["drop"] == [] and len(would["dba"]) == 3, would
+    # The common fields (an empty observed: the lists stay top-level) and the literal.
+    assert would["confirm"] == f"DELETE {ingest.source_id}"
+    assert (would["table"], would["observed"], would["next_steps"]) == (None, {}, [])
     assert lifecycle(log)[0] is None  # read only
     done = go(populated, preview_id=would["preview_id"], **delete(ingest))
     assert done["status"] == "done" and done["lifecycle"] == "deleted" and done["dropped"] == []

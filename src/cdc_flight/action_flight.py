@@ -546,7 +546,14 @@ def perform(apply, inputs, *, run_id, actor, owner, trigger, run=None, fault=Non
             lambda: record_preview(apply, run_id, inputs, promised),
             effect=previews,
         )
-        return _out(inputs, result, run_id, preview_id=run_id, **extra)
+        # The literal the real run needs: accept-types' comes from this dry run; a
+        # typed-first one (quarantine) is the one this run checked.
+        confirm = (
+            result.observed.get("confirm")
+            if action == "accept-types"
+            else inputs.values.get("confirm")
+        )
+        return _out(inputs, result, run_id, preview_id=run_id, confirm=confirm, **extra)
 
     if action in table_actions.ACTIONS:
         library = table_actions.ACTIONS[action]
@@ -662,7 +669,7 @@ def main(owner, environ=None, spec=None, *, fault=None, command="table-action"):
     except InputError as exc:
         run.step("validate", "ok", branch="refused")
         run.step("invalid", "ok")
-        print(json.dumps(dict(status="refused", detail=str(exc))))
+        print(json.dumps(base.refusal(environ, spec or TABLE_ACTION, str(exc))))
         return EXIT["refused"]
     run.step("validate", "ok", branch="ok")
     run_id, config = run_id_from(environ), owner.config()
@@ -696,12 +703,14 @@ def main(owner, environ=None, spec=None, *, fault=None, command="table-action"):
             # Through the normal path, so the audit copy records the reason.
             run.step("decide", "ok", branch="refused")
             run.step("refused", "ok")
-            out = dict(
-                status="refused",
-                action=inputs.action,
-                table=inputs.table,
-                detail=refusal,
-                run_id=run_id,
+            out = base.envelope(
+                dict(
+                    status="refused",
+                    action=inputs.action,
+                    table=inputs.table,
+                    detail=refusal,
+                    run_id=run_id,
+                )
             )
         else:
             out = None

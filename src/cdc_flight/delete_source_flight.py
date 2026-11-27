@@ -33,6 +33,7 @@ from cdc_flight.action_base import (
     actor_of,
     decision,
     ensure_previews,
+    envelope,
     finish,
     merged,
     parse,
@@ -41,6 +42,7 @@ from cdc_flight.action_base import (
     spender,
     whois,
 )
+from cdc_flight.action_base import refusal as refusal_line
 from cdc_flight.action_types import Refused
 from cdc_flight.chain import FLIGHT_CONFIG
 from cdc_flight.config import IngestConfig, heartbeat_writer, identifier
@@ -155,7 +157,9 @@ class Owner:
 
 
 def _out(inputs, status, detail, *, run_id, **extra):
-    return dict(status=status, action=inputs.action, detail=detail, run_id=run_id, **extra)
+    return envelope(
+        dict(status=status, action=inputs.action, detail=detail, run_id=run_id, **extra)
+    )
 
 
 def perform(log, config, inputs, *, run_id, actor, owner, run=None, started_by=None, wait=WAIT):
@@ -211,6 +215,7 @@ def perform(log, config, inputs, *, run_id, actor, owner, run=None, started_by=N
             run_id=run_id,
             lifecycle=lifecycle,
             preview_id=run_id,
+            confirm=confirmation(owner.source_id),
             **lists,
         )
     claim = None
@@ -264,7 +269,7 @@ def main(owner, environ=None):
     except InputError as exc:
         run.step("validate", "ok", branch="refused")
         run.step("invalid", "ok")
-        print(json.dumps(dict(status="refused", detail=str(exc))))
+        print(json.dumps(refusal_line(environ, DELETE, str(exc))))
         return EXIT["refused"]
     run.step("validate", "ok", branch="ok")
     dsn = environ.get(owner.dsn_env, "")

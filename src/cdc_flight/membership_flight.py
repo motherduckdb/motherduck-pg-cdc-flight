@@ -42,6 +42,7 @@ from cdc_flight.action_base import (
     checker,
     decision,
     ensure_previews,
+    envelope,
     finish,
     merged,
     parse,
@@ -50,6 +51,7 @@ from cdc_flight.action_base import (
     spender,
     whois,
 )
+from cdc_flight.action_base import refusal as refusal_line
 from cdc_flight.apply import Apply
 from cdc_flight.chain import FLIGHT_CONFIG, run_flight
 from cdc_flight.config import ApplyConfig, IngestConfig, heartbeat_writer, identifier, quoted
@@ -258,8 +260,10 @@ def perform(log, apply, pg, inputs, *, run_id, actor, owner, trigger, run=None, 
     except SourceDeleted as exc:
         run.step("decide", "ok", branch="refused")
         run.step("refused", "ok")
-        return dict(
-            status="refused", action=inputs.action, table=table, detail=str(exc), run_id=run_id
+        return envelope(
+            dict(
+                status="refused", action=inputs.action, table=table, detail=str(exc), run_id=run_id
+            )
         )
     hooks = {}
     if not inputs.dry_run:
@@ -306,7 +310,9 @@ def perform(log, apply, pg, inputs, *, run_id, actor, owner, trigger, run=None, 
             lambda: record_preview(log, run_id, inputs, decided, PREVIEWS),
             effect=previews,
         )
-        return _out(inputs, result, run_id, preview_id=run_id)
+        # A forced remove's literal (checked at parse); none for anything else.
+        confirm = inputs.values.get("confirm")
+        return _out(inputs, result, run_id, preview_id=run_id, confirm=confirm)
     run.step("decide", "ok", branch="act")
     run.step("act", "ok", effect=f"table:{owner.database}.{owner.source_id}.tables")
     outcome = "done" if result.status in DONE else result.status
@@ -363,7 +369,7 @@ def main(owner, environ=None):
     except InputError as exc:
         run.step("validate", "ok", branch="refused")
         run.step("invalid", "ok")
-        print(json.dumps(dict(status="refused", detail=str(exc))))
+        print(json.dumps(refusal_line(environ, MEMBERSHIP, str(exc))))
         return EXIT["refused"]
     run.step("validate", "ok", branch="ok")
     run_id = run_id_from(environ)
@@ -409,12 +415,14 @@ def main(owner, environ=None):
         if refusal:
             run.step("decide", "ok", branch="refused")
             run.step("refused", "ok")
-            out = dict(
-                status="refused",
-                action=inputs.action,
-                table=inputs.table,
-                detail=refusal,
-                run_id=run_id,
+            out = envelope(
+                dict(
+                    status="refused",
+                    action=inputs.action,
+                    table=inputs.table,
+                    detail=refusal,
+                    run_id=run_id,
+                )
             )
         else:
             started_by = whois(con, environ, run)
