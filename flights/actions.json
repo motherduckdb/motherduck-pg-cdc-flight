@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "note": "The action Flights' API, machine-readable: inputs, actions, confirmations, previews, statuses and result fields. Data, checked against the code by tests/test_actions_spec.py; never shipped in a Flight. The reference for people is docs/actions-api.md.",
+  "run": {
+    "start": "SELECT run_id, run_number FROM MD_RUN_FLIGHT(flight_id := ?::UUID, config := map(?::VARCHAR[], ?::VARCHAR[]))",
+    "poll": "SELECT status, exit_code FROM MD_GET_FLIGHT_RUN(flight_id := ?::UUID, run_number := ?)",
+    "terminal": ["SUCCEEDED", "FAILED", "CANCELLED"],
+    "log": "SELECT * FROM MD_GET_FLIGHT_LOGS(flight_id := ?::UUID, run_number := ?, \"limit\" := 2000, \"order\" := 'asc')",
+    "audit": "SELECT * FROM cdc_ops.main.audit WHERE request_id = ?",
+    "values": "every config value is a string; \"\" means unset"
+  },
+  "preview_minutes": 15,
+  "request_id_pattern": "[A-Za-z0-9_-]{1,64}",
+  "framework_keys": ["CDC_ACTION", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+  "exit_codes": {"would": 0, "done": 0, "already": 0, "waiting": 0, "refused": 2, "busy": 3, "failed": 1},
+  "lsn_text": "X/Y: the high and low 32 bits in uppercase hex, no leading zeros (0/5a is written 0/5A)",
+  "lsn_keys": [
+    "abandoned_active_commit_lsn", "abandoned_first_commit_lsn", "abandoned_last_commit_lsn",
+    "abandoned_unit_start_lsn", "active_commit_lsn", "blocked_commit_lsn", "checkpoint",
+    "confirmed_end", "first_commit_lsn", "last_commit_lsn", "last_member_commit_lsn",
+    "last_member_end_lsn", "open_unit_anchor", "unit_end_lsn", "unit_start_lsn"
+  ],
+  "int_keys": [
+    "abandoned_chunk_count", "abandoned_frame_end", "abandoned_into_epoch", "config_revision",
+    "durable_frame_end", "format_version", "generation_id", "open_chunks", "source_epoch",
+    "unit_commit_count", "unit_event_count"
+  ],
+  "formats": {
+    "dry_run": {"description": "0 or 1 (blank: 0)", "valid": ["0", "1"], "invalid": ["yes", "true", "2"]},
+    "preview_id": {"description": "the dry run's run id, a UUID", "valid": ["6f1c0a52-3c1e-4b8e-9d0a-2f6a1c9b7e10"], "invalid": ["preview-1", "123"]},
+    "request_id": {"description": "1-64 of A-Z a-z 0-9 _ -", "valid": ["r-1", "dive_2026-11-27"], "invalid": ["has space", "a/b"]},
+    "table": {"description": "schema.table, both plain identifiers", "valid": ["public.items"], "invalid": ["items", "a.b.c"]},
+    "state": {"enum": ["live", "paused", "needs_action", "needs_resync"], "invalid": ["held", "LIVE"]},
+    "lsn": {"description": "X/Y in hex, 1-8 digits each side, any case", "valid": ["0/5A", "0/5a", "1/0"], "invalid": ["5A", "0/", "0/123456789"]},
+    "lsn_or_none": {"description": "X/Y in hex, or none (a hold with no blocked commit)", "valid": ["0/5A", "none"], "invalid": ["5A", "None"]},
+    "epoch": {"description": "an integer 1..2147483647", "valid": ["1", "42"], "invalid": ["0", "-1", "x", "2147483648"]},
+    "bit": {"enum": ["0", "1"], "invalid": ["true", "yes"]},
+    "mode": {"enum": ["keyed", "append"], "invalid": ["insert"]},
+    "text": {"description": "free text, compared exactly", "valid": ["anything"], "invalid": []},
+    "text200": {"description": "free text up to 200 characters, compared exactly", "max_length": 200, "valid": ["anything"], "invalid": []}
+  },
+  "confirm_rules": {
+    "none": "the action takes no confirmation; CDC_CONFIRM stays blank",
+    "both_runs": "typed first: the exact literal on the dry run and, byte for byte, on the real run (it is hashed into the preview)",
+    "real_run_only": "the dry run returns the literal (observed.confirm); only the real run sends it (not hashed)",
+    "forced_only": "only with CDC_FORCE=1, then on both runs, exactly (hashed)"
+  },
+  "flights": {
+    "table-action": {
+      "default_name": "cdc-{source}-table-action",
+      "keys": ["CDC_ACTION", "CDC_TABLE", "CDC_EXPECTED_STATE", "CDC_EXPECTED_BLOCKED_LSN", "CDC_CONFIRM", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+      "formats": {"CDC_TABLE": "table", "CDC_EXPECTED_STATE": "state", "CDC_EXPECTED_BLOCKED_LSN": "lsn_or_none", "CDC_CONFIRM": "text"},
+      "previews": "<mirror>._cdc.previews",
+      "postgres": false,
+      "statuses": ["would", "done", "already", "refused", "busy", "failed"],
+      "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
+      "result_extras": ["preview_id", "triggered", "remaining"],
+      "actions": {
+        "pause": {"required": ["CDC_TABLE", "CDC_EXPECTED_STATE"], "optional": [], "confirm": "none", "triggers": null,
+          "decision_fields": ["state", "generation", "epoch", "format_version", "generation_id"]},
+        "resume": {"required": ["CDC_TABLE", "CDC_EXPECTED_STATE"], "optional": [], "confirm": "none", "triggers": null,
+          "decision_fields": ["state", "generation", "epoch", "format_version", "generation_id"]},
+        "retry": {"required": ["CDC_TABLE", "CDC_EXPECTED_BLOCKED_LSN"], "optional": [], "confirm": "none", "triggers": null,
+          "decision_fields": ["state", "generation", "epoch", "blocked", "format_version", "source_epoch", "generation_id", "unit_start_lsn", "unit_end_lsn", "unit_commit_count", "unit_digest", "config_revision"]},
+        "resync": {"required": ["CDC_TABLE", "CDC_EXPECTED_STATE"], "optional": [], "confirm": "none", "triggers": "backfill",
+          "decision_fields": ["state", "generation", "active_generation", "format_version", "generation_id", "capture_mode", "ignore_deletes"]},
+        "start-from-log": {"required": ["CDC_TABLE"], "optional": [], "confirm": "none", "triggers": null,
+          "decision_fields": ["capture_mode", "generation", "format_version"]},
+        "start-snapshot": {"required": ["CDC_TABLE"], "optional": [], "confirm": "none", "triggers": "backfill",
+          "decision_fields": ["generation", "active_generation", "capture_mode", "source_held"]},
+        "accept-types": {"required": ["CDC_TABLE"], "optional": ["CDC_CONFIRM"], "confirm": "real_run_only",
+          "literal": "ACCEPT TYPES {table} {digest}", "triggers": null,
+          "decision_fields": ["state", "generation", "epoch", "blocked", "format_version", "source_epoch", "generation_id", "unit_start_lsn", "unit_end_lsn", "unit_commit_count", "unit_digest", "config_revision", "type_digest"]},
+        "resync-all": {"required": [], "optional": [], "confirm": "none", "triggers": "backfill",
+          "decision_fields": ["needs_resync"]},
+        "compact-now": {"required": [], "optional": [], "confirm": "none", "triggers": "compact",
+          "decision_fields": []}
+      }
+    },
+    "quarantine": {
+      "default_name": "cdc-{source}-quarantine",
+      "keys": ["CDC_ACTION", "CDC_TABLE", "CDC_EXPECTED_EPOCH", "CDC_CONFIRM", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+      "formats": {"CDC_TABLE": "table", "CDC_EXPECTED_EPOCH": "epoch", "CDC_CONFIRM": "text200"},
+      "previews": "<mirror>._cdc.previews",
+      "postgres": false,
+      "statuses": ["would", "done", "already", "refused", "busy"],
+      "result_fields": ["status", "action", "table", "detail", "next_steps", "observed", "run_id"],
+      "result_extras": ["preview_id"],
+      "actions": {
+        "quarantine": {"required": ["CDC_TABLE", "CDC_EXPECTED_EPOCH", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
+          "literal": "QUARANTINE {table} UNIT {epoch} {unit_start_lsn}..{unit_end_lsn}", "triggers": null,
+          "decision_fields": ["state", "generation", "epoch", "blocked", "format_version", "source_epoch", "generation_id", "unit_start_lsn", "unit_end_lsn", "unit_commit_count", "unit_digest", "config_revision"]}
+      }
+    },
+    "table-membership": {
+      "default_name": "cdc-{source}-table-membership",
+      "keys": ["CDC_ACTION", "CDC_TABLE", "CDC_FORCE", "CDC_CONFIRM", "CDC_MODE", "CDC_IGNORE_DELETES", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+      "formats": {"CDC_TABLE": "table", "CDC_FORCE": "bit", "CDC_CONFIRM": "text200", "CDC_MODE": "mode", "CDC_IGNORE_DELETES": "bit"},
+      "previews": "cdc_internal.<source>.previews",
+      "postgres": true,
+      "statuses": ["would", "done", "already", "refused", "busy", "failed"],
+      "result_fields": ["status", "action", "table", "result", "detail", "next_steps", "observed", "run_id"],
+      "result_extras": ["preview_id", "triggered"],
+      "actions": {
+        "add": {"required": ["CDC_TABLE"], "optional": ["CDC_MODE", "CDC_IGNORE_DELETES"], "confirm": "none",
+          "requires": {"CDC_IGNORE_DELETES=1": "CDC_MODE=append"}, "triggers": "backfill",
+          "decision_fields": ["oid", "published", "by_oid", "holder", "format_version", "source_epoch", "checkpoint", "partial", "open_unit_anchor", "config_revision"]},
+        "remove": {"required": ["CDC_TABLE"], "optional": ["CDC_FORCE", "CDC_CONFIRM"], "confirm": "forced_only",
+          "literal": "REMOVE {table}", "triggers": null,
+          "decision_fields": ["row", "active_generation", "format_version", "source_epoch", "checkpoint", "partial", "open_unit_anchor", "config_revision"]}
+      }
+    },
+    "epoch": {
+      "default_name": "cdc-{source}-epoch",
+      "keys": ["CDC_ACTION", "CDC_EXPECTED_EPOCH", "CDC_TO_LSN", "CDC_CONFIRM", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+      "formats": {"CDC_EXPECTED_EPOCH": "epoch", "CDC_TO_LSN": "lsn", "CDC_CONFIRM": "text200"},
+      "previews": "cdc_internal.<source>.previews",
+      "postgres": true,
+      "statuses": ["would", "done", "already", "refused", "waiting"],
+      "result_fields": ["status", "action", "detail", "next_steps", "observed", "run_id"],
+      "result_extras": ["preview_id", "epoch", "slot", "start_lsn", "abandoned", "abandoned_bytes_effective", "requested_to_lsn", "clamped", "leftover_slot", "pending_slot", "abandoned_unit_start_lsn", "abandoned_frame_end", "abandoned_chunk_count", "abandoned_first_commit_lsn", "abandoned_last_commit_lsn", "abandoned_active_commit_lsn", "abandoned_into_epoch", "abandoned_reason"],
+      "actions": {
+        "recover-slot": {"required": ["CDC_EXPECTED_EPOCH", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
+          "literal": "RECOVER {source} EPOCH {next_epoch}", "triggers": null,
+          "decision_fields": ["epoch", "reason", "slot", "checkpoint", "slot_present", "slot_active", "slot_lost", "new_slot", "new_slot_present", "format_version", "source_epoch", "partial", "open_unit_anchor", "open_chunks", "active_commit_lsn", "last_member_end_lsn", "durable_frame_end"]},
+        "skip-to-lsn": {"required": ["CDC_EXPECTED_EPOCH", "CDC_TO_LSN", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
+          "literal": "SKIP {source} TO {to_lsn}", "triggers": null,
+          "decision_fields": ["epoch", "reason", "slot", "checkpoint", "slot_present", "slot_active", "slot_lost", "to_lsn", "slot_confirmed", "abandoned_bytes", "format_version", "source_epoch", "partial", "open_unit_anchor", "open_chunks", "active_commit_lsn", "last_member_end_lsn", "durable_frame_end"]}
+      }
+    },
+    "delete-source": {
+      "default_name": "cdc-{source}-delete-source",
+      "keys": ["CDC_ACTION", "CDC_EXPECTED_EPOCH", "CDC_CONFIRM", "CDC_DRY_RUN", "CDC_PREVIEW_ID", "CDC_REQUEST_ID"],
+      "formats": {"CDC_EXPECTED_EPOCH": "epoch", "CDC_CONFIRM": "text200"},
+      "previews": "cdc_internal.<source>.previews",
+      "postgres": true,
+      "statuses": ["would", "done", "already", "refused", "waiting"],
+      "result_fields": ["status", "action", "detail", "run_id"],
+      "result_extras": ["preview_id", "lifecycle", "drop", "dba", "retained_bytes", "dropped", "next_steps"],
+      "actions": {
+        "delete-source": {"required": ["CDC_EXPECTED_EPOCH", "CDC_CONFIRM"], "optional": [], "confirm": "both_runs",
+          "literal": "DELETE {source}", "triggers": null,
+          "decision_fields": ["epoch", "lifecycle", "slot", "slot_active", "drop", "dba", "format_version", "source_epoch", "checkpoint", "partial", "open_unit_anchor"]}
+      }
+    }
+  }
+}

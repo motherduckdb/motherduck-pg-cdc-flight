@@ -1097,7 +1097,8 @@ def test_accept_types_real_run_spends_the_preview_of_a_dry_run_without_the_confi
     assert stored_type(h, ITEMS_T, "value") == [1043, 24]
     assert previews(h) == [(out["preview_id"], "accept-types", True, run_id, "flight:test")]
     again = go(h, action="accept-types", table=ITEMS_T, confirm=text, preview_id=out["preview_id"])
-    assert again["status"] == "refused", again  # spent: no longer a type hold to accept
+    # Accepted: no type hold is left (and the preview is spent).
+    assert again["status"] == "refused", again
 
 
 def test_only_accept_types_leaves_the_confirmation_out_of_the_preview_hash():

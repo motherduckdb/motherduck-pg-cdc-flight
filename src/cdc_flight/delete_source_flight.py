@@ -1,4 +1,4 @@
-"""The delete-source Flight: the destructive tier, granted to the org.
+"""The delete-source Flight: the destructive tier, run by its owner only.
 
 It wraps delete_source.delete_source on the action framework: OWNER baked in (the
 source, slot, publication, heartbeat, the secret's *name*, databases); the Flight

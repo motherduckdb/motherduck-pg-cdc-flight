@@ -16,6 +16,7 @@ maintenance actions, which are also implemented as Flights.
   marked.
 - [Flights](docs/flights.md): building, deploying, scheduling and chaining them, and PostgreSQL TLS.
 - [Operations](docs/operations.md): the `cdc_ops` status database and the operator-action Flights;
+  [the action Flights API](docs/actions-api.md), for scripts and agents;
   [the operations Dive](docs/dive.md); [runbooks](docs/runbooks.md).
 - [Tables](docs/tables.md): which tables are captured, held states, and what source DDL does.
 - [Retention](docs/retention.md): compaction and consumer expiry; [upgrading](docs/upgrading.md).

@@ -326,6 +326,10 @@ other viewer ([dive.md](dive.md#actions)). The guards stop mis-clicks, stale scr
 wrong targets, not an owner who means the action. The authoritative record is in the database each action
 changes.
 
+To run them from a script or an AI agent, use the [action Flights API](actions-api.md): one
+reference for every input, confirmation, preview and result, with a machine-readable copy in
+`flights/actions.json`. This section covers each action's effect and guards in depth.
+
 ### The table-action Flight
 
 One per source, built with the owner's settings baked in:
@@ -349,7 +353,7 @@ uv run python scripts/build_flight.py table-action out/table_action.py --package
 | `compact-now` | none | Starts the compaction Flight with the owner's settings |
 
 Each run prints one JSON line: `status` (`done`, `already`, `would`, `refused`,
-`busy` or `failed`), `action`, `table`, `detail`, `next_steps`, `observed`, `run_id`,
+`busy` or `failed`; the epoch and delete-source Flights also report `waiting`), `action`, `table`, `detail`, `next_steps`, `observed`, `run_id`,
 and `preview_id` (a dry run), `triggered` (a started Flight) or `remaining`
 (resync-all). Exit codes: 0 for done, already and would; 2 refused; 3 busy; 1 failed.
 `cdc-flight-tables pause|resume|retry` runs the same library functions, so the CLI and
@@ -659,7 +663,7 @@ advice: the unique-index statement first, otherwise the FULL statement.
 `MD_RUN_FLIGHT` and the Dive can override any key a Flight declares. So an action Flight
 declares **only its action's inputs**, each with a `""` default, which means unset:
 - table-action: `CDC_ACTION`, `CDC_TABLE`, `CDC_EXPECTED_STATE`,
-  `CDC_EXPECTED_BLOCKED_LSN`, `CDC_DRY_RUN` and `CDC_PREVIEW_ID`;
+  `CDC_EXPECTED_BLOCKED_LSN`, `CDC_CONFIRM`, `CDC_DRY_RUN` and `CDC_PREVIEW_ID`;
 - table-membership: `CDC_ACTION`, `CDC_TABLE`, `CDC_FORCE`, `CDC_CONFIRM`, `CDC_MODE`,
   `CDC_IGNORE_DELETES`, `CDC_DRY_RUN` and `CDC_PREVIEW_ID`. A table-membership Flight
   deployed before `CDC_MODE` existed lacks those two keys, and `deploy_dive.py` reports it
@@ -743,6 +747,9 @@ The preview is a hash over:
 | resync | state, generation, active backfill |
 | resync-all | the eligible `needs_resync` tables |
 | compact-now | none |
+
+This table summarizes; `flights/actions.json` lists every action's decision fields, for all
+five Flights, as the code hashes them.
 
 The lease token and the applied checkpoint are shown but not hashed, so an apply run
 between the dry run and the click doesn't invalidate the preview.
