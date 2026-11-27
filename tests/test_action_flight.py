@@ -1060,3 +1060,64 @@ def test_accept_types_takes_a_confirm_and_no_other_action_does():
                 "CDC_DRY_RUN": "1",
             }
         )
+
+
+@LOCAL
+def test_accept_types_real_run_spends_the_preview_of_a_dry_run_without_the_confirmation(
+    stores, tmp_path
+):
+    """The documented flow: the dry run (no CDC_CONFIRM) returns the literal, and the real
+    run sends it with the dry run's preview id. The literal isn't hashed: its digest and
+    the type_digest decision field already bind the change."""
+    from test_table_actions import retyped_items, stored_type
+
+    h = Harness(stores, tmp_path)
+    retyped_items(h)
+    out = go(h, action="accept-types", table=ITEMS_T, dry_run="1")
+    assert out["status"] == "would", out
+    text = out["observed"]["confirm"]
+    wrong = go(
+        h,
+        action="accept-types",
+        table=ITEMS_T,
+        confirm=f"ACCEPT TYPES {ITEMS_T} 000000000000",
+        preview_id=out["preview_id"],
+    )
+    assert wrong["status"] == "refused" and wrong["detail"] == f"type exactly: {text}", wrong
+    assert previews(h)[0][2] is False  # a wrong literal leaves the preview unspent
+    done = go(
+        h,
+        action="accept-types",
+        table=ITEMS_T,
+        confirm=text,
+        preview_id=out["preview_id"],
+        run_id=(run_id := str(uuid.uuid4())),
+    )
+    assert done["status"] == "done", done
+    assert stored_type(h, ITEMS_T, "value") == [1043, 24]
+    assert previews(h) == [(out["preview_id"], "accept-types", True, run_id, "flight:test")]
+    again = go(h, action="accept-types", table=ITEMS_T, confirm=text, preview_id=out["preview_id"])
+    assert again["status"] == "refused", again  # spent: no longer a type hold to accept
+
+
+def test_only_accept_types_leaves_the_confirmation_out_of_the_preview_hash():
+    def parsed(environ):
+        return af.parse({"CDC_TABLE": ITEMS_T, **environ})
+
+    dry = parsed({"CDC_ACTION": "accept-types", "CDC_DRY_RUN": "1"})
+    real = parsed(
+        {
+            "CDC_ACTION": "accept-types",
+            "CDC_CONFIRM": "ACCEPT TYPES public.items abc",
+            "CDC_PREVIEW_ID": str(uuid.uuid4()),
+        }
+    )
+    decided = dict(type_digest="abc")
+    assert af.preview_hash(dry, decided) == af.preview_hash(real, decided)
+    # The typed-first literals stay hashed: their real run repeats the dry run's text.
+    from cdc_flight.quarantine_flight import QUARANTINE
+
+    q = dict(CDC_ACTION="quarantine", CDC_TABLE=ITEMS_T, CDC_EXPECTED_EPOCH="1")
+    one = af.base.parse({**q, "CDC_CONFIRM": "a", "CDC_DRY_RUN": "1"}, QUARANTINE)
+    two = af.base.parse({**q, "CDC_CONFIRM": "b", "CDC_DRY_RUN": "1"}, QUARANTINE)
+    assert af.preview_hash(one, {}) != af.preview_hash(two, {})

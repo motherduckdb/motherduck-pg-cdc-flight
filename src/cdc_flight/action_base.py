@@ -180,13 +180,21 @@ def merged(observed, extra):
     return dict(observed, **extra)
 
 
+# Inputs a preview doesn't hash, by action: accept-types' literal comes from its dry run,
+# so only the real run carries it. Its digest and the type_digest decision field already
+# bind the change, and the library compares the literal exactly. A typed-first literal
+# (quarantine, epoch, delete-source, a forced remove) is sent on both runs and stays hashed.
+UNHASHED = {"accept-types": ("confirm",)}
+
+
 def preview_hash(inputs, decided):
     """sha256 of the canonical JSON of the inputs and the decision fields:
     LSNs as integers, so 0/5a and 0/5A hash alike."""
+    skip = UNHASHED.get(inputs.action, ())
     payload = dict(
         action=inputs.action,
         table=list(split_table(inputs.table)) if inputs.table else None,
-        inputs=inputs.values,
+        inputs={k: v for k, v in inputs.values.items() if k not in skip},
         decision=decided,
     )
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
