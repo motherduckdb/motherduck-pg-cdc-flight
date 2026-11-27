@@ -162,13 +162,41 @@ def parse(environ, spec):
     return Inputs(action, table, values, dry_run, preview or None, request_id or None)
 
 
-def run_id_from(environ):
+# Every action Flight's result carries these fields (docs/actions-api.md#results), each
+# Flight's own extras beside them. A `would` also carries `confirm`: the exact literal
+# its real run needs, or null.
+ENVELOPE = ("status", "action", "table", "detail", "next_steps", "observed", "run_id")
+
+
+def envelope(out):
+    """`out` with every common field present: missing ones take their empty value
+    (table and run_id null, next_steps [], observed {}); a `would` gains confirm=null
+    unless it names one. Existing values and extras are kept as they are."""
+    full = dict(
+        status=None, action=None, table=None, detail="", next_steps=[], observed={}, run_id=None
+    )
+    full.update(out)
+    if full["status"] == "would":
+        full.setdefault("confirm", None)
+    return full
+
+
+def refusal(environ, spec, detail):
+    """The result of a run refused before any connection (an invalid input): no audit
+    row is written, so this line is its only record. `action` only when it is one of the
+    Flight's actions; `run_id` only inside a Flight."""
+    action = environ.get("CDC_ACTION", "")
+    out = dict(status="refused", action=action if action in spec.uses else None, detail=detail)
+    return envelope(dict(out, run_id=run_id_from(environ, new=False)))
+
+
+def run_id_from(environ, *, new=True):
     """The runtime's MOTHERDUCK_FLIGHT_RUN_ID (a dry run's preview id); outside a
-    Flight, a new one."""
+    Flight, a new one (or None with new=False)."""
     try:
         return str(uuid.UUID(environ.get("MOTHERDUCK_FLIGHT_RUN_ID", "")))
     except ValueError:
-        return str(uuid.uuid4())
+        return str(uuid.uuid4()) if new else None
 
 
 def merged(observed, extra):

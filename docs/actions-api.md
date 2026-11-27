@@ -36,7 +36,7 @@ follows these steps every time:
    nothing but its own preview row.
 3. **Show the user the preview** before anything else: `detail`, `next_steps`, the relevant
    `observed` values, and for delete-source the `drop` and `dba` lists. For an action with a
-   confirmation, show the exact literal.
+   confirmation, show the exact literal: the result's `confirm`.
 4. **Get the user's explicit confirmation.** For an action with a typed confirmation, the user
    approves that literal. Never confirm on the user's behalf, and never run a real run the user
    didn't approve.
@@ -99,8 +99,8 @@ Then read the result. There are two places:
    is the same JSON result. Lines starting `@flight-run` are progress, not results.
 
 **No audit row is written** in three cases, so the log is the only record:
-- an input was refused before the Flight connected (exit 2; the line has only `status` and
-  `detail`);
+- an input was refused before the Flight connected (exit 2; `action` is null when it wasn't one
+  of the Flight's actions, and `table` and `observed` are empty);
 - the run crashed (exit 1, a traceback, no result line);
 - `cdc_ops` doesn't exist yet.
 
@@ -196,10 +196,14 @@ Each confirmation is compared exactly. There are three kinds:
     checked: if those have moved, the refusal says "state changed" instead.
   - A blank `CDC_CONFIRM` is refused before the Flight connects, with no literal.
 - **From the dry run** (`accept-types`): the dry run takes no `CDC_CONFIRM` and returns the
-  literal `ACCEPT TYPES <schema.table> <digest>` in `observed.confirm` and in `next_steps`.
+  literal `ACCEPT TYPES <schema.table> <digest>` in `confirm` (also in `observed.confirm` and
+  `next_steps`).
   Only the real run sends it. Its digest names the exact change, so a moved state needs a new
   dry run.
 - **None:** every other action. `CDC_CONFIRM` stays blank.
+
+Every `would` result has `confirm`: the exact literal its real run sends, or null for an action
+without one. For a typed-first action it's the literal the dry run checked.
 
 ## The preview: dry run, then real run
 
@@ -235,18 +239,25 @@ Each confirmation is compared exactly. There are three kinds:
 
 ## Results
 
-Each run prints one JSON line, which is also `cdc_ops.audit.result`. Common fields:
+Each run prints one JSON line, which is also `cdc_ops.audit.result`. Every result has these
+fields, whichever Flight and however the run ended; an empty one is `null`, `[]` or `{}`:
 
 | Field | Meaning |
 | --- | --- |
 | `status` | `would`, `done`, `already`, `waiting`, `refused`, `busy` or `failed` |
 | `action` | the action |
-| `table` | the table (`table-action`, `quarantine`, `table-membership`) |
+| `table` | the table; `null` for `epoch` and `delete-source`, and for actions without one |
 | `detail` | what happened or would happen, in words |
 | `next_steps` | what to do next, in words |
 | `observed` | what the run read: the preview's facts. LSNs here are raw integers ([LSNs](#lsns)). |
-| `run_id` | this run's id |
-| `preview_id` | on a `would`: the id the real run sends |
+| `run_id` | this run's id (`null` for an input refusal outside a Flight run) |
+
+A `would` also has:
+
+| Field | Meaning |
+| --- | --- |
+| `preview_id` | the id the real run sends as `CDC_PREVIEW_ID` |
+| `confirm` | the exact `CDC_CONFIRM` the real run sends, or `null` ([Confirmations](#confirmations)) |
 
 Per Flight:
 - **`table-action`:** `triggered` (`flight`, `run_id`, `run_number` of the started run), and
@@ -257,10 +268,8 @@ Per Flight:
   `leftover_slot`, `pending_slot`, and the abandoned unit (`abandoned_unit_start_lsn`, …).
   These LSNs are `X/Y` text.
 - **`delete-source`:** `lifecycle`, and `drop`, `dba`, `retained_bytes` on a dry run, or
-  `dropped`, `dba`, `retained_bytes` on a real run. It has no `table` or `observed`.
-
-A refusal before the action is reached has `status`, `action`, `detail`, `run_id` and, where
-applicable, `table`. Examples: a source that isn't initialized, or one being deleted.
+  `dropped`, `dba`, `retained_bytes` on a real run. Its `observed` is empty: the lists are
+  top-level.
 
 ### Statuses and exit codes
 

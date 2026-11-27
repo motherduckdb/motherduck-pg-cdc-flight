@@ -46,6 +46,7 @@ from cdc_flight.action_base import (
     spender,
     whois,
 )
+from cdc_flight.action_base import refusal as refusal_line
 from cdc_flight.action_types import Refused, parse_lsn
 from cdc_flight.chain import FLIGHT_CONFIG
 from cdc_flight.config import (
@@ -197,6 +198,7 @@ def _out(inputs, status, detail, *, run_id, observed=None, next_steps=(), **extr
     return dict(
         status=status,
         action=inputs.action,
+        table=None,
         detail=detail,
         next_steps=list(next_steps),
         observed=observed or {},
@@ -353,6 +355,7 @@ def perform(
             run_id=run_id,
             observed=observed,
             preview_id=run_id,
+            confirm=literal,
             next_steps=[RESYNC_ALL],
         )
 
@@ -468,7 +471,7 @@ def main(owner, environ=None):
     except InputError as exc:
         run.step("validate", "ok", branch="refused")
         run.step("invalid", "ok")
-        print(json.dumps(dict(status="refused", detail=str(exc))))
+        print(json.dumps(refusal_line(environ, EPOCH, str(exc))))
         return EXIT["refused"]
     run.step("validate", "ok", branch="ok")
     dsn = environ.get(owner.dsn_env, "")

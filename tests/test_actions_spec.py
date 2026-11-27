@@ -125,6 +125,65 @@ def test_the_decision_fields_match(flight, action):
     assert FLIGHTS[flight]["actions"][action]["decision_fields"] == list(DECISIONS[flight][action])
 
 
+# Results --------------------------------------------------------------------------
+
+OWNERS = {
+    "table-action": lambda: af.Owner(SOURCE, str(uuid.uuid4()), str(uuid.uuid4())),
+    "quarantine": lambda: qf.Owner(SOURCE),
+    "table-membership": lambda: mf.Owner(SOURCE, str(uuid.uuid4())),
+    "epoch": lambda: ef.Owner(SOURCE),
+    "delete-source": lambda: dsf.Owner(SOURCE),
+}
+MAINS = {
+    "table-action": af.main,
+    "quarantine": qf.main,
+    "table-membership": mf.main,
+    "epoch": ef.main,
+    "delete-source": dsf.main,
+}
+
+
+def test_the_envelope_is_the_codes():
+    assert SPEC["result_envelope"] == list(base.ENVELOPE)
+    for name, flight in FLIGHTS.items():
+        assert flight["result_fields"][: len(base.ENVELOPE)] == list(base.ENVELOPE), name
+        assert set(SPEC["would_fields"]) <= set(flight["result_extras"]), name
+
+
+def test_the_envelope_fills_only_what_is_missing():
+    assert base.envelope({"status": "refused", "detail": "x"}) == dict(
+        status="refused",
+        action=None,
+        table=None,
+        detail="x",
+        next_steps=[],
+        observed={},
+        run_id=None,
+    )
+    kept = base.envelope({"status": "would", "confirm": "DELETE shop", "drop": ["a"]})
+    assert kept["confirm"] == "DELETE shop" and kept["drop"] == ["a"]
+    assert base.envelope({"status": "would"})["confirm"] is None
+    assert "confirm" not in base.envelope({"status": "done"})
+
+
+@pytest.mark.parametrize("flight", FLIGHTS)
+def test_an_input_refusal_prints_the_envelope(flight, capsys):
+    """A run refused before any connection writes no audit row: its line is the only
+    record, and it has the common fields too."""
+    run_id = str(uuid.uuid4())
+    action = next(iter(FLIGHTS[flight]["actions"]))
+    for environ, named in (
+        ({"CDC_ACTION": action, "MOTHERDUCK_FLIGHT_RUN_ID": run_id}, action),
+        ({"CDC_ACTION": "explode", "MOTHERDUCK_FLIGHT_RUN_ID": run_id}, None),
+    ):
+        assert MAINS[flight](OWNERS[flight](), environ) == SPEC["exit_codes"]["refused"]
+        out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+        assert list(out) == SPEC["result_envelope"], out
+        assert (out["status"], out["action"], out["run_id"]) == ("refused", named, run_id)
+    MAINS[flight](OWNERS[flight](), {"CDC_ACTION": "explode"})  # outside a Flight
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["run_id"] is None
+
+
 # Inputs ---------------------------------------------------------------------------
 
 

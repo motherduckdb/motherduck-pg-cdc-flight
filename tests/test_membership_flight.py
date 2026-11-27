@@ -70,6 +70,8 @@ def go(fixture, *, trigger=None, run=None, run_id=None, wait=0, **env):
 def dry(fixture, **env):
     out = go(fixture, dry_run="1", **env)
     assert out["status"] == "would", out
+    # A forced remove's literal, else none.
+    assert out["confirm"] == (env.get("confirm") or None), out
     return out["preview_id"]
 
 

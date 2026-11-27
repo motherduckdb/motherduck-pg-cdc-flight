@@ -352,10 +352,13 @@ uv run python scripts/build_flight.py table-action out/table_action.py --package
 | `resync-all` | none | Starts **one** backfill, for the `needs_resync` table held longest that has no backfill running, and reports `remaining`. Run it again for the next |
 | `compact-now` | none | Starts the compaction Flight with the owner's settings |
 
-Each run prints one JSON line: `status` (`done`, `already`, `would`, `refused`,
-`busy` or `failed`; the epoch and delete-source Flights also report `waiting`), `action`, `table`, `detail`, `next_steps`, `observed`, `run_id`,
-and `preview_id` (a dry run), `triggered` (a started Flight) or `remaining`
-(resync-all). Exit codes: 0 for done, already and would; 2 refused; 3 busy; 1 failed.
+Each run prints one JSON line. Every action Flight's line has `status` (`done`, `already`,
+`would`, `refused`, `busy` or `failed`; the epoch and delete-source Flights also report
+`waiting`), `action`, `table`, `detail`, `next_steps`, `observed` and `run_id`, empty when they
+don't apply. A dry run's `would` adds `preview_id` and `confirm` (the exact `CDC_CONFIRM` its
+real run needs, or null); table-action adds `triggered` (a started Flight) and `remaining`
+(resync-all). Exit codes: 0 for done, already, would and waiting; 2 refused; 3 busy; 1 failed.
+See the [action Flights API](actions-api.md#results) for every Flight's fields.
 `cdc-flight-tables pause|resume|retry` runs the same library functions, so the CLI and
 the Flight give the same answer for the same state.
 

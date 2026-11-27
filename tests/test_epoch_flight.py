@@ -174,6 +174,7 @@ def test_recover_dry_run_then_real_run_begins_the_epoch(stores, populated):  # n
         before = log.position()
         would = go(populated, dry_run="1", **recover(ingest))
         assert would["status"] == "would" and new_slot in would["detail"], would
+        assert would["confirm"] == recover(ingest)["confirm"] and would["table"] is None
         assert log.position() == before and confirmed(source, new_slot) is None  # read only
         done = go(populated, preview_id=would["preview_id"], started_by="alice", **recover(ingest))
         assert done["status"] == "done" and done["epoch"] == 2 and done["slot"] == new_slot, done
@@ -234,6 +235,7 @@ def test_skip_abandons_the_range_and_records_it(stores, populated):  # noqa: F81
         checkpoint = log.position()[2]
         would = go(populated, dry_run="1", **skip(ingest, target))
         assert would["status"] == "would" and f"{target - checkpoint} bytes" in would["detail"]
+        assert would["confirm"] == f"SKIP {ingest.source_id} TO {lsn_text(target)}"
         done = go(populated, preview_id=would["preview_id"], **skip(ingest, target))
         assert done["status"] == "done" and done["abandoned"] == [
             lsn_text(checkpoint),
