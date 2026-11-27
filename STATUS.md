@@ -53,24 +53,29 @@ experimental release without official support. How to work in the repository is 
    they apply, the table, the replication slot, the epoch and the mirror database. The operations Dive gets a log
    view filtered by those tags. Install failures happen before the package runs, so they still show only in the
    Flight's own run log.
-4. **Raising the ingest ceiling.** The TPC-C log analysis is done: format-2 ingest is bound by MotherDuck
+4. **Column exclusion at ingest** (needs a design). Today every published column is captured: PostgreSQL publication
+   column lists are refused (they can't combine with `REPLICA IDENTITY FULL`), and there is no exclusion setting.
+   The proposal: a per-table list of columns that ingest drops (or stores hashed or masked) before writing the change
+   log, so they never reach MotherDuck storage. PostgreSQL still sends them to the Flight. Key columns can't be
+   excluded. It touches the frozen change-log format, so it needs a versioned format change.
+5. **Raising the ingest ceiling.** The TPC-C log analysis is done: format-2 ingest is bound by MotherDuck
    appends (about 1.13 s per ~5.9k-frame batch, about 230 txn/s); a longer schedule, a native decoder and
    splitting slots each buy little or need a large design. Ingest logs per-append timing; the next step
    is deciding, from those logs under load, between configuration levers (DuckDB threads, larger batches, the
    checkpoint threshold) and a separate spool process. Not yet attributed: one ~2 s append COMMIT per batched run; a post-commit
    stall seen with many tables on one page. Sources over 50 tables are unprofiled.
-5. **5,000 tpmC with the package install** is untested and close (about 1.4 s of a 3.2 s margin); the
+6. **5,000 tpmC with the package install** is untested and close (about 1.4 s of a 3.2 s margin); the
    `*/3` ceiling and apply lag are unmeasured. Dependency installs over 10 s happen in about 1 in 55 runs;
    caching or vendoring them is an option, not started.
-6. **Read replica follow-ups.** Ending an ingest run early when the heartbeat job has stopped (needs a design
+7. **Read replica follow-ups.** Ending an ingest run early when the heartbeat job has stopped (needs a design
    round; never when upstream contact is unknown). Failover and promotion are unsupported.
-7. **UPDATE and DELETE on keyless tables** (needs a design). Append mode captures inserts only: an UPDATE
+8. **UPDATE and DELETE on keyless tables** (needs a design). Append mode captures inserts only: an UPDATE
    holds the table, and a DELETE holds it unless `ignore_deletes` is set. Candidates under `REPLICA
    IDENTITY FULL`: a multiset delete/update matching one row equal to the old image, or recording each
    change as history. It changes append apply, not the frozen protocol files.
-8. **Deferred:** the notifier, and the operator drill (the destructive Flights get dry runs only until
+9. **Deferred:** the notifier, and the operator drill (the destructive Flights get dry runs only until
    then). Not planned: a separate source/mirror verifier.
-9. **Small follow-ups:** recheck conflict-message matching when upgrading the pinned DuckDB 1.5.6; consider
+10. **Small follow-ups:** recheck conflict-message matching when upgrading the pinned DuckDB 1.5.6; consider
    mapping a registration conflict before lease acquisition to busy (today it fails loudly and can be
    retried); measure the named metadata projections in-region before claiming a gain; still unconverted to
    typed specs: the other `apply_state` writers, ingest's hot-path source writes and the registry's
